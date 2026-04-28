@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Pastelería · Costeo</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --crema: #fdf6ee;
+    --rosa: #e8a598;
+    --rosa-oscuro: #c97b6e;
+    --marron: #5c3d2e;
+    --marron-claro: #8b5e4a;
+    --verde: #7a9e7e;
+    --amarillo: #f4c96e;
+    --texto: #3a2a22;
+    --gris: #9e8a80;
+    --blanco: #fff;
+    --sombra: 0 4px 24px rgba(92,61,46,0.10);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--crema); font-family: 'DM Sans', sans-serif; color: var(--texto); min-height: 100vh; }
+
+  /* HEADER */
+  header {
+    background: var(--marron);
+    color: var(--crema);
+    padding: 18px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 16px rgba(92,61,46,0.18);
+  }
+  header h1 { font-family: 'Playfair Display', serif; font-size: 1.4rem; font-weight: 700; letter-spacing: 0.02em; }
+  header span { font-size: 0.8rem; color: var(--rosa); font-style: italic; }
+
+  /* NAV */
+  nav {
+    background: var(--blanco);
+    display: flex;
+    border-bottom: 2px solid #f0e4d8;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  nav::-webkit-scrollbar { display: none; }
+  nav button {
+    flex: 1;
+    min-width: 120px;
+    padding: 14px 20px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--gris);
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  nav button.active { color: var(--marron); border-bottom-color: var(--rosa); font-weight: 600; }
+  nav button:hover:not(.active) { color: var(--marron-claro); background: var(--crema); }
+
+  /* MAIN */
+  main { max-width: 900px; margin: 0 auto; padding: 24px 16px 80px; }
+
+  /* CARDS */
+  .card {
+    background: var(--blanco);
+    border-radius: 16px;
+    box-shadow: var(--sombra);
+    padding: 20px;
+    margin-bottom: 16px;
+    transition: box-shadow 0.2s;
+  }
+  .card:hover { box-shadow: 0 8px 32px rgba(92,61,46,0.14); }
+
+  /* STATS */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 24px; }
+  .stat {
+    background: var(--blanco);
+    border-radius: 14px;
+    padding: 18px;
+    text-align: center;
+    box-shadow: var(--sombra);
+    border-top: 4px solid var(--rosa);
+  }
+  .stat .num { font-family: 'Playfair Display', serif; font-size: 2rem; font-weight: 700; color: var(--marron); }
+  .stat .lbl { font-size: 0.78rem; color: var(--gris); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+
+  /* SECCION TITULO */
+  .sec-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.3rem;
+    color: var(--marron);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .sec-title::after { content: ''; flex: 1; height: 1px; background: #f0e4d8; }
+
+  /* TABLA INGREDIENTES */
+  .ing-list { display: flex; flex-direction: column; gap: 8px; }
+  .ing-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--blanco);
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(92,61,46,0.06);
+    border-left: 4px solid var(--crema);
+    transition: border-color 0.2s;
+  }
+  .ing-row:hover { border-left-color: var(--rosa); }
+  .ing-nombre { flex: 1; font-weight: 500; font-size: 0.95rem; }
+  .ing-unidad { font-size: 0.78rem; color: var(--gris); background: var(--crema); padding: 2px 8px; border-radius: 20px; }
+  .ing-precio { display: flex; align-items: center; gap: 6px; }
+  .ing-precio span { font-size: 0.8rem; color: var(--gris); }
+  .precio-input {
+    width: 90px;
+    border: 1.5px solid #f0e4d8;
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 0.95rem;
+    font-family: 'DM Sans', sans-serif;
+    text-align: right;
+    background: var(--crema);
+    color: var(--texto);
+    transition: border-color 0.2s;
+  }
+  .precio-input:focus { outline: none; border-color: var(--rosa); background: var(--blanco); }
+  .btn-save {
+    background: var(--rosa);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-weight: 600;
+    transition: background 0.2s;
+  }
+  .btn-save:hover { background: var(--rosa-oscuro); }
+
+  /* RECETAS GRID */
+  .recetas-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+  .receta-card {
+    background: var(--blanco);
+    border-radius: 16px;
+    box-shadow: var(--sombra);
+    padding: 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-top: 4px solid var(--amarillo);
+    position: relative;
+  }
+  .receta-card:hover { transform: translateY(-3px); box-shadow: 0 12px 36px rgba(92,61,46,0.14); }
+  .receta-card h3 { font-family: 'Playfair Display', serif; font-size: 1.1rem; color: var(--marron); margin-bottom: 12px; }
+  .receta-card .notas { font-size: 0.78rem; color: var(--gris); font-style: italic; margin-bottom: 10px; }
+  .receta-nums { display: flex; flex-direction: column; gap: 6px; }
+  .receta-num-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; }
+  .receta-num-row .lbl { color: var(--gris); }
+  .receta-num-row .val { font-weight: 600; color: var(--texto); }
+  .precio-final-badge {
+    margin-top: 14px;
+    background: var(--marron);
+    color: var(--crema);
+    border-radius: 10px;
+    padding: 10px 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .precio-final-badge .lbl { font-size: 0.78rem; opacity: 0.75; }
+  .precio-final-badge .val { font-family: 'Playfair Display', serif; font-size: 1.2rem; font-weight: 700; }
+
+  /* DETALLE RECETA */
+  .detalle-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+  .btn-back {
+    background: var(--crema);
+    border: none;
+    border-radius: 10px;
+    padding: 8px 14px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--marron);
+    font-weight: 600;
+    transition: background 0.2s;
+  }
+  .btn-back:hover { background: #f0e4d8; }
+  .detalle-titulo { font-family: 'Playfair Display', serif; font-size: 1.5rem; color: var(--marron); }
+  .detalle-resumen {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .detalle-stat {
+    background: var(--crema);
+    border-radius: 12px;
+    padding: 14px;
+    text-align: center;
+  }
+  .detalle-stat .num { font-family: 'Playfair Display', serif; font-size: 1.4rem; font-weight: 700; color: var(--marron); }
+  .detalle-stat .lbl { font-size: 0.75rem; color: var(--gris); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 4px; }
+
+  .ing-detalle-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: var(--crema);
+    border-radius: 10px;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+  }
+  .ing-detalle-row .nombre { flex: 1; font-weight: 500; }
+  .ing-detalle-row .cant { color: var(--gris); font-size: 0.82rem; min-width: 80px; }
+  .ing-detalle-row .costo { font-weight: 600; color: var(--marron-claro); min-width: 80px; text-align: right; }
+  .ing-detalle-row .btn-del { background: none; border: none; color: #e8a598; cursor: pointer; font-size: 1.1rem; padding: 2px 6px; border-radius: 6px; transition: background 0.15s; }
+  .ing-detalle-row .btn-del:hover { background: #fce8e4; color: var(--rosa-oscuro); }
+
+  /* AGREGAR INGREDIENTE */
+  .add-ing-form {
+    background: var(--crema);
+    border-radius: 12px;
+    padding: 16px;
+    margin-top: 16px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+  }
+  .add-ing-form label { font-size: 0.78rem; color: var(--gris); display: block; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .add-ing-form select, .add-ing-form input {
+    border: 1.5px solid #e8d8cc;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.9rem;
+    background: var(--blanco);
+    color: var(--texto);
+  }
+  .add-ing-form select:focus, .add-ing-form input:focus { outline: none; border-color: var(--rosa); }
+  .add-ing-form select { min-width: 160px; }
+  .add-ing-form input { width: 100px; }
+
+  /* BOTONES */
+  .btn-primary {
+    background: var(--marron);
+    color: var(--crema);
+    border: none;
+    border-radius: 10px;
+    padding: 10px 20px;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 600;
+    transition: background 0.2s;
+  }
+  .btn-primary:hover { background: var(--marron-claro); }
+  .btn-secondary {
+    background: var(--blanco);
+    color: var(--marron);
+    border: 1.5px solid var(--rosa);
+    border-radius: 10px;
+    padding: 10px 20px;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 600;
+    transition: all 0.2s;
+  }
+  .btn-secondary:hover { background: var(--crema); }
+
+  /* CONFIGURACION RECETA */
+  .config-receta {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+    padding: 16px;
+    background: var(--crema);
+    border-radius: 12px;
+    align-items: flex-end;
+  }
+  .config-receta label { font-size: 0.78rem; color: var(--gris); display: block; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .config-receta input {
+    border: 1.5px solid #e8d8cc;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.9rem;
+    background: var(--blanco);
+    color: var(--texto);
+    width: 120px;
+  }
+  .config-receta input:focus { outline: none; border-color: var(--rosa); }
+
+  /* NUEVA RECETA FORM */
+  .nueva-receta-form {
+    background: var(--blanco);
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: var(--sombra);
+    margin-bottom: 20px;
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+  }
+  .nueva-receta-form label { font-size: 0.78rem; color: var(--gris); display: block; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .nueva-receta-form input {
+    border: 1.5px solid #e8d8cc;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.9rem;
+    background: var(--crema);
+    color: var(--texto);
+  }
+  .nueva-receta-form input:focus { outline: none; border-color: var(--rosa); background: var(--blanco); }
+
+  /* TOAST */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--verde);
+    color: white;
+    padding: 12px 20px;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 0.88rem;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.3s;
+    z-index: 999;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+
+  /* SEARCH */
+  .search-box {
+    width: 100%;
+    border: 1.5px solid #e8d8cc;
+    border-radius: 12px;
+    padding: 10px 16px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.95rem;
+    background: var(--blanco);
+    color: var(--texto);
+    margin-bottom: 16px;
+  }
+  .search-box:focus { outline: none; border-color: var(--rosa); }
+
+  /* LOADING */
+  .loading { text-align: center; padding: 40px; color: var(--gris); font-style: italic; }
+
+  /* MARGEN EDITABLE */
+  .margen-tag {
+    background: var(--amarillo);
+    color: var(--marron);
+    border-radius: 20px;
+    padding: 3px 10px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    position: absolute;
+    top: 16px;
+    right: 16px;
+  }
+
+  @media (max-width: 600px) {
+    header h1 { font-size: 1.1rem; }
+    .recetas-grid { grid-template-columns: 1fr; }
+    .ing-row { flex-wrap: wrap; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🧁 Pastelería</h1>
+    <span>Sistema de costeo</span>
+  </div>
+</header>
+
+<nav>
+  <button class="active" onclick="showTab('resumen')">📊 Resumen</button>
+  <button onclick="showTab('ingredientes')">🥚 Ingredientes</button>
+  <button onclick="showTab('recetas')">📋 Recetas</button>
+</nav>
+
+<main id="app">
+  <div class="loading">Cargando...</div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = '';
+let ingredientes = [];
+let recetas = [];
+let tabActual = 'resumen';
+let recetaDetalle = null;
+
+function fmt(n) {
+  return '$' + Math.round(n).toLocaleString('es-AR');
+}
+
+function toast(msg, color = '#7a9e7e') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = color;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+async function get(url) {
+  const r = await fetch(API + url);
+  return r.json();
+}
+async function put(url, body) {
+  const r = await fetch(API + url, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  return r.json();
+}
+async function post(url, body) {
+  const r = await fetch(API + url, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  return r.json();
+}
+async function del(url) {
+  const r = await fetch(API + url, { method: 'DELETE' });
+  return r.json();
+}
+
+async function cargarDatos() {
+  [ingredientes, recetas] = await Promise.all([get('/ingredientes'), get('/recetas')]);
+}
+
+function showTab(tab) {
+  tabActual = tab;
+  recetaDetalle = null;
+  document.querySelectorAll('nav button').forEach((b,i) => {
+    b.classList.toggle('active', ['resumen','ingredientes','recetas'][i] === tab);
+  });
+  render();
+}
+
+async function render() {
+  const app = document.getElementById('app');
+  if (tabActual === 'resumen') renderResumen(app);
+  else if (tabActual === 'ingredientes') renderIngredientes(app);
+  else if (tabActual === 'recetas') {
+    if (recetaDetalle) renderDetalle(app);
+    else renderRecetas(app);
+  }
+}
+
+// ── RESUMEN ──
+async function renderResumen(app) {
+  const data = await get('/resumen');
+  app.innerHTML = `
+    <div class="stats">
+      <div class="stat"><div class="num">${data.total_ingredientes}</div><div class="lbl">Ingredientes</div></div>
+      <div class="stat"><div class="num">${data.total_recetas}</div><div class="lbl">Recetas</div></div>
+    </div>
+    <div class="sec-title">Todos los productos</div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      ${data.productos.map(p => `
+        <div class="card" style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;cursor:pointer;" onclick="verReceta('${p.nombre}')">
+          <div>
+            <div style="font-family:'Playfair Display',serif;font-weight:600;font-size:1rem;color:var(--marron)">${p.nombre}</div>
+            <div style="font-size:0.8rem;color:var(--gris);margin-top:3px">Costo: ${fmt(p.costo)}</div>
+          </div>
+          <div style="font-family:'Playfair Display',serif;font-size:1.3rem;font-weight:700;color:var(--marron)">${fmt(p.precio_final)}</div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+async function verReceta(nombre) {
+  const r = recetas.find(x => x.nombre === nombre);
+  if (r) {
+    recetaDetalle = r;
+    tabActual = 'recetas';
+    document.querySelectorAll('nav button').forEach((b,i) => b.classList.toggle('active', i === 2));
+    render();
+  }
+}
+
+// ── INGREDIENTES ──
+let ingEditandoId = null;
+
+function renderIngredientes(app) {
+  app.innerHTML = `
+    <div class="sec-title">Ingredientes</div>
+
+    <!-- FORMULARIO NUEVO / EDITAR -->
+    <div class="nueva-receta-form" id="form-ing">
+      <div><label>Nombre</label><input type="text" id="ing-nombre" placeholder="Ej: Manteca"/></div>
+      <div>
+        <label>Unidad</label>
+        <select id="ing-unidad" style="border:1.5px solid #e8d8cc;border-radius:8px;padding:8px 12px;font-family:'DM Sans',sans-serif;font-size:0.9rem;background:var(--crema);color:var(--texto);">
+          <option value="KG">KG (por kilo)</option>
+          <option value="LT">LT (por litro)</option>
+          <option value="UN">UN (por unidad)</option>
+        </select>
+      </div>
+      <div><label>Precio ($)</label><input type="number" id="ing-precio" placeholder="Ej: 2200"/></div>
+      <button class="btn-primary" onclick="guardarIngrediente()">+ Agregar</button>
+      <button class="btn-secondary" id="btn-cancelar-ing" style="display:none" onclick="cancelarEdicion()">Cancelar</button>
+    </div>
+
+    <input class="search-box" type="text" placeholder="🔍 Buscar ingrediente..." oninput="filtrarIng(this.value)"/>
+    <div class="ing-list" id="ing-list">
+      ${renderIngList(ingredientes)}
+    </div>
+  `;
+}
+
+function renderIngList(lista) {
+  return lista.map(ing => `
+    <div class="ing-row" id="ing-row-${ing.id}">
+      <span class="ing-nombre">${ing.nombre}</span>
+      <span class="ing-unidad">${ing.unidad}</span>
+      <div class="ing-precio">
+        <span>$</span>
+        <input class="precio-input" type="number" value="${ing.precio}" id="precio-${ing.id}"
+          onkeydown="if(event.key==='Enter') guardarPrecio(${ing.id})"/>
+        <button class="btn-save" onclick="guardarPrecio(${ing.id})" title="Guardar precio">✓</button>
+      </div>
+      <button onclick="editarIngrediente(${ing.id})" title="Editar"
+        style="background:var(--crema);border:none;border-radius:8px;padding:5px 10px;cursor:pointer;color:var(--marron-claro);font-size:0.9rem;">✏️</button>
+      <button onclick="eliminarIngrediente(${ing.id}, '${ing.nombre}')" title="Eliminar"
+        style="background:none;border:none;cursor:pointer;color:var(--rosa);font-size:1rem;padding:5px 8px;border-radius:6px;" >🗑️</button>
+    </div>
+  `).join('');
+}
+
+function filtrarIng(q) {
+  const lista = ingredientes.filter(i => i.nombre.toLowerCase().includes(q.toLowerCase()));
+  document.getElementById('ing-list').innerHTML = renderIngList(lista);
+}
+
+function editarIngrediente(id) {
+  const ing = ingredientes.find(i => i.id === id);
+  if (!ing) return;
+  ingEditandoId = id;
+  document.getElementById('ing-nombre').value = ing.nombre;
+  document.getElementById('ing-unidad').value = ing.unidad;
+  document.getElementById('ing-precio').value = ing.precio;
+  document.querySelector('#form-ing button.btn-primary').textContent = '💾 Guardar cambios';
+  document.getElementById('btn-cancelar-ing').style.display = '';
+  document.getElementById('ing-nombre').focus();
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+function cancelarEdicion() {
+  ingEditandoId = null;
+  document.getElementById('ing-nombre').value = '';
+  document.getElementById('ing-precio').value = '';
+  document.querySelector('#form-ing button.btn-primary').textContent = '+ Agregar';
+  document.getElementById('btn-cancelar-ing').style.display = 'none';
+}
+
+async function guardarIngrediente() {
+  const nombre = document.getElementById('ing-nombre').value.trim();
+  const unidad = document.getElementById('ing-unidad').value;
+  const precio = parseFloat(document.getElementById('ing-precio').value);
+  if (!nombre) { toast('Ingresá un nombre', '#e8a598'); return; }
+  if (isNaN(precio) || precio < 0) { toast('Precio inválido', '#e8a598'); return; }
+
+  if (ingEditandoId) {
+    // MODIFICAR
+    const r = await put(`/ingredientes/${ingEditandoId}`, { nombre, unidad, precio });
+    if (r.detail) { toast(r.detail, '#e8a598'); return; }
+    const idx = ingredientes.findIndex(i => i.id === ingEditandoId);
+    if (idx >= 0) ingredientes[idx] = r;
+    cancelarEdicion();
+    recetas = await get('/recetas');
+    document.getElementById('ing-list').innerHTML = renderIngList(ingredientes);
+    toast('✓ Ingrediente actualizado');
+  } else {
+    // CREAR
+    const r = await post('/ingredientes', { nombre, unidad, precio });
+    if (r.detail) { toast(r.detail, '#e8a598'); return; }
+    ingredientes.push(r);
+    ingredientes.sort((a,b) => a.nombre.localeCompare(b.nombre));
+    cancelarEdicion();
+    document.getElementById('ing-list').innerHTML = renderIngList(ingredientes);
+    toast('✓ Ingrediente creado');
+  }
+}
+
+async function guardarPrecio(id) {
+  const input = document.getElementById(`precio-${id}`);
+  const precio = parseFloat(input.value);
+  if (isNaN(precio) || precio < 0) { toast('Precio inválido', '#e8a598'); return; }
+  await put(`/ingredientes/${id}`, { precio });
+  const idx = ingredientes.findIndex(i => i.id === id);
+  if (idx >= 0) ingredientes[idx].precio = precio;
+  recetas = await get('/recetas');
+  toast('✓ Precio actualizado');
+}
+
+async function eliminarIngrediente(id, nombre) {
+  if (!confirm(`¿Eliminar "${nombre}"?\n\nSi está siendo usado en alguna receta no se podrá eliminar.`)) return;
+  const r = await del(`/ingredientes/${id}`);
+  if (r.detail) { toast(r.detail, '#e8a598'); return; }
+  ingredientes = ingredientes.filter(i => i.id !== id);
+  document.getElementById('ing-list').innerHTML = renderIngList(ingredientes);
+  toast('Ingrediente eliminado', '#c97b6e');
+}
+
+// ── RECETAS ──
+function renderRecetas(app) {
+  app.innerHTML = `
+    <div class="sec-title">Recetas</div>
+    <div class="nueva-receta-form">
+      <div><label>Nombre del producto</label><input type="text" id="nueva-nombre" placeholder="Ej: Torta Chocolate"/></div>
+      <div><label>Gastos extra ($)</label><input type="number" id="nueva-gastos" value="300"/></div>
+      <div><label>Margen (x)</label><input type="number" id="nueva-margen" value="3" step="0.1"/></div>
+      <button class="btn-primary" onclick="crearReceta()">+ Nueva receta</button>
+    </div>
+    <div class="recetas-grid">
+      ${recetas.map(r => `
+        <div class="receta-card" onclick="abrirDetalle(${r.id})">
+          <span class="margen-tag">x${r.margen}</span>
+          <h3>${r.nombre}</h3>
+          ${r.notas ? `<div class="notas">${r.notas}</div>` : ''}
+          <div class="receta-nums">
+            <div class="receta-num-row"><span class="lbl">Ingredientes</span><span class="val">${fmt(r.costo_ingredientes)}</span></div>
+            <div class="receta-num-row"><span class="lbl">Gastos extra</span><span class="val">${fmt(r.gastos_extra)}</span></div>
+            <div class="receta-num-row"><span class="lbl">Costo total</span><span class="val">${fmt(r.costo_total)}</span></div>
+          </div>
+          <div class="precio-final-badge">
+            <span class="lbl">Precio sugerido</span>
+            <span class="val">${fmt(r.precio_final)}</span>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+async function crearReceta() {
+  const nombre = document.getElementById('nueva-nombre').value.trim();
+  const gastos = parseFloat(document.getElementById('nueva-gastos').value) || 300;
+  const margen = parseFloat(document.getElementById('nueva-margen').value) || 3;
+  if (!nombre) { toast('Ingresá un nombre', '#e8a598'); return; }
+  const r = await post('/recetas', { nombre, gastos_extra: gastos, margen });
+  if (r.detail) { toast(r.detail, '#e8a598'); return; }
+  recetas = await get('/recetas');
+  recetaDetalle = r;
+  render();
+  toast('✓ Receta creada');
+}
+
+async function abrirDetalle(id) {
+  const data = await get(`/recetas/${id}`);
+  recetaDetalle = data;
+  render();
+}
+
+// ── DETALLE ──
+async function renderDetalle(app) {
+  const r = recetaDetalle;
+  app.innerHTML = `
+    <div class="detalle-header">
+      <button class="btn-back" onclick="volverRecetas()">← Volver</button>
+      <span class="detalle-titulo">${r.nombre}</span>
+      <button onclick="eliminarReceta(${r.id}, '${r.nombre}')"
+        style="margin-left:auto;background:#fce8e4;border:none;border-radius:10px;padding:8px 16px;cursor:pointer;color:var(--rosa-oscuro);font-weight:600;font-size:0.88rem;transition:background 0.2s;"
+        onmouseover="this.style.background='#f8d0c8'" onmouseout="this.style.background='#fce8e4'">
+        🗑️ Eliminar receta
+      </button>
+    </div>
+
+    <div class="config-receta">
+      <div><label>Gastos extra ($)</label><input type="number" id="cfg-gastos" value="${r.gastos_extra}"/></div>
+      <div><label>Margen (x)</label><input type="number" id="cfg-margen" value="${r.margen}" step="0.1"/></div>
+      <button class="btn-primary" onclick="guardarConfig(${r.id})">Guardar</button>
+    </div>
+
+    <div class="detalle-resumen">
+      <div class="detalle-stat"><div class="num">${fmt(r.costo_ingredientes)}</div><div class="lbl">Ingredientes</div></div>
+      <div class="detalle-stat"><div class="num">${fmt(r.gastos_extra)}</div><div class="lbl">Gastos extra</div></div>
+      <div class="detalle-stat"><div class="num">${fmt(r.costo_total)}</div><div class="lbl">Costo total</div></div>
+      <div class="detalle-stat" style="background:var(--marron);color:var(--crema)">
+        <div class="num" style="color:var(--amarillo)">${fmt(r.precio_final)}</div>
+        <div class="lbl" style="color:rgba(255,255,255,0.7)">Precio final</div>
+      </div>
+    </div>
+
+    <div class="sec-title">Ingredientes</div>
+    <div id="ing-detalle">
+      ${renderIngDetalle(r.ingredientes)}
+    </div>
+
+    <div class="add-ing-form">
+      <div>
+        <label>Ingrediente</label>
+        <select id="add-ing-sel">
+          ${ingredientes.map(i => `<option value="${i.id}">${i.nombre} (${i.unidad})</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <label>Cantidad (g / ml / unid)</label>
+        <input type="number" id="add-ing-cant" placeholder="Ej: 200"/>
+      </div>
+      <button class="btn-primary" onclick="agregarIngrediente(${r.id})">+ Agregar</button>
+    </div>
+  `;
+}
+
+function renderIngDetalle(lista) {
+  if (!lista.length) return '<div style="color:var(--gris);font-style:italic;padding:12px">Sin ingredientes aún</div>';
+  return lista.map(i => `
+    <div class="ing-detalle-row">
+      <span class="nombre">${i.nombre}</span>
+      <span class="cant">${i.cantidad} ${i.unidad === 'UN' ? 'un.' : 'g/ml'}</span>
+      <span class="costo">${fmt(i.costo_real)}</span>
+      <button class="btn-del" onclick="quitarIngrediente(${recetaDetalle.id}, ${i.id})" title="Quitar">✕</button>
+    </div>
+  `).join('');
+}
+
+async function guardarConfig(recetaId) {
+  const gastos = parseFloat(document.getElementById('cfg-gastos').value);
+  const margen = parseFloat(document.getElementById('cfg-margen').value);
+  const data = await put(`/recetas/${recetaId}`, { gastos_extra: gastos, margen });
+  recetaDetalle = data;
+  recetas = await get('/recetas');
+  render();
+  toast('✓ Configuración guardada');
+}
+
+async function agregarIngrediente(recetaId) {
+  const ing_id = parseInt(document.getElementById('add-ing-sel').value);
+  const cantidad = parseFloat(document.getElementById('add-ing-cant').value);
+  if (isNaN(cantidad) || cantidad <= 0) { toast('Cantidad inválida', '#e8a598'); return; }
+  const data = await post(`/recetas/${recetaId}/ingredientes`, { ingrediente_id: ing_id, cantidad });
+  recetaDetalle = data;
+  recetas = await get('/recetas');
+  render();
+  toast('✓ Ingrediente agregado');
+}
+
+async function quitarIngrediente(recetaId, riId) {
+  const data = await del(`/recetas/${recetaId}/ingredientes/${riId}`);
+  recetaDetalle = data;
+  recetas = await get('/recetas');
+  render();
+  toast('Ingrediente quitado', '#c97b6e');
+}
+
+async function volverRecetas() {
+  recetaDetalle = null;
+  recetas = await get('/recetas');
+  render();
+}
+
+async function eliminarReceta(id, nombre) {
+  if (!confirm(`¿Eliminar la receta "${nombre}"?\n\nEsta acción no se puede deshacer.`)) return;
+  await del(`/recetas/${id}`);
+  recetaDetalle = null;
+  recetas = await get('/recetas');
+  tabActual = 'recetas';
+  render();
+  toast('Receta eliminada', '#c97b6e');
+}
+
+// INICIO
+(async () => {
+  await cargarDatos();
+  render();
+})();
+</script>
+</body>
+</html>
