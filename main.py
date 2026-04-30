@@ -4,7 +4,8 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Optional
-import sqlite3
+import psycopg2
+import psycopg2.extras
 import os
 
 app = FastAPI(title="Pastelería - Sistema de Costeo", version="1.0.0")
@@ -16,49 +17,51 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-DB_PATH = "pasteleria.db"
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
 # ─────────────────────────────────────────
 # Base de datos
 # ─────────────────────────────────────────
 
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
     return conn
 
 def init_db():
     conn = get_db()
     c = conn.cursor()
-    c.executescript("""
+    c.execute("""
         CREATE TABLE IF NOT EXISTS ingredientes (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            id          SERIAL PRIMARY KEY,
             nombre      TEXT UNIQUE NOT NULL,
             unidad      TEXT NOT NULL,
             precio      REAL NOT NULL,
-            updated_at  TEXT DEFAULT (datetime('now','localtime'))
-        );
-
+            updated_at  TEXT DEFAULT (NOW()::text)
+        )
+    """)
+    c.execute("""
         CREATE TABLE IF NOT EXISTS recetas (
-            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            id              SERIAL PRIMARY KEY,
             nombre          TEXT UNIQUE NOT NULL,
             gastos_extra    REAL DEFAULT 300,
             margen          REAL DEFAULT 3.0,
             notas           TEXT,
-            created_at      TEXT DEFAULT (datetime('now','localtime'))
-        );
-
+            created_at      TEXT DEFAULT (NOW()::text)
+        )
+    """)
+    c.execute("""
         CREATE TABLE IF NOT EXISTS receta_ingredientes (
-            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            id              SERIAL PRIMARY KEY,
             receta_id       INTEGER NOT NULL REFERENCES recetas(id) ON DELETE CASCADE,
             ingrediente_id  INTEGER NOT NULL REFERENCES ingredientes(id),
             cantidad        REAL NOT NULL
-        );
+        )
     """)
     conn.commit()
 
     # Cargar ingredientes si la tabla está vacía
-    count = conn.execute("SELECT COUNT(*) FROM ingredientes").fetchone()[0]
+    c.execute("SELECT COUNT(*) FROM ingredientes")
+    count = c.fetchone()["count"]
     if count == 0:
         ingredientes = [
             ("Manteca", "KG", 2200),
@@ -109,18 +112,20 @@ def init_db():
             ("Gelatina ss", "KG", 19000),
             ("Cafe Instantaneo", "KG", 8000),
         ]
-        conn.executemany(
-            "INSERT INTO ingredientes (nombre, unidad, precio) VALUES (?,?,?)",
+        c.executemany(
+            "INSERT INTO ingredientes (nombre, unidad, precio) VALUES (%s, %s, %s)",
             ingredientes
         )
         conn.commit()
 
     # Cargar recetas si la tabla está vacía
-    count_r = conn.execute("SELECT COUNT(*) FROM recetas").fetchone()[0]
+    c.execute("SELECT COUNT(*) FROM recetas")
+    count_r = c.fetchone()["count"]
     if count_r == 0:
         def get_id(nombre):
-            row = conn.execute("SELECT id FROM ingredientes WHERE nombre=?", (nombre,)).fetchone()
-            return row[0] if row else None
+            c.execute("SELECT id FROM ingredientes WHERE nombre=%s", (nombre,))
+            row = c.fetchone()
+            return row["id"] if row else None
 
         recetas_data = [
             {
@@ -272,19 +277,20 @@ def init_db():
 
         for r in recetas_data:
             notas = r.get("notas", None)
-            conn.execute(
-                "INSERT INTO recetas (nombre, gastos_extra, margen, notas) VALUES (?,?,?,?)",
+            c.execute(
+                "INSERT INTO recetas (nombre, gastos_extra, margen, notas) VALUES (%s, %s, %s, %s) RETURNING id",
                 (r["nombre"], r["gastos_extra"], r["margen"], notas)
             )
-            receta_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+            receta_id = c.fetchone()["id"]
             for ing_nombre, cantidad in r["ingredientes"]:
                 ing_id = get_id(ing_nombre)
                 if ing_id:
-                    conn.execute(
-                        "INSERT INTO receta_ingredientes (receta_id, ingrediente_id, cantidad) VALUES (?,?,?)",
+                    c.execute(
+                        "INSERT INTO receta_ingredientes (receta_id, ingrediente_id, cantidad) VALUES (%s, %s, %s)",
                         (receta_id, ing_id, cantidad)
                     )
         conn.commit()
+    c.close()
     conn.close()
 
 init_db()
@@ -326,57 +332,71 @@ class RecetaIngredienteItem(BaseModel):
 @app.get("/ingredientes", tags=["Ingredientes"])
 def listar_ingredientes():
     conn = get_db()
-    rows = conn.execute("SELECT * FROM ingredientes ORDER BY nombre").fetchall()
+    c = conn.cursor()
+    c.execute("SELECT * FROM ingredientes ORDER BY nombre")
+    rows = c.fetchall()
+    c.close()
     conn.close()
     return [dict(r) for r in rows]
 
 @app.post("/ingredientes", tags=["Ingredientes"], summary="Crear nuevo ingrediente")
 def crear_ingrediente(data: IngredienteCreate):
     conn = get_db()
+    c = conn.cursor()
     try:
-        conn.execute(
-            "INSERT INTO ingredientes (nombre, unidad, precio) VALUES (?,?,?)",
+        c.execute(
+            "INSERT INTO ingredientes (nombre, unidad, precio) VALUES (%s, %s, %s) RETURNING *",
             (data.nombre.strip(), data.unidad.upper(), data.precio)
         )
+        row = c.fetchone()
         conn.commit()
-        row = conn.execute("SELECT * FROM ingredientes WHERE nombre=?", (data.nombre.strip(),)).fetchone()
+        c.close()
         conn.close()
         return dict(row)
     except Exception:
+        conn.rollback()
+        c.close()
         conn.close()
         raise HTTPException(400, f"Ya existe un ingrediente con el nombre '{data.nombre}'")
 
 @app.put("/ingredientes/{ing_id}", tags=["Ingredientes"], summary="Actualizar ingrediente")
 def actualizar_ingrediente(ing_id: int, data: IngredienteUpdate):
     conn = get_db()
-    row = conn.execute("SELECT * FROM ingredientes WHERE id=?", (ing_id,)).fetchone()
+    c = conn.cursor()
+    c.execute("SELECT * FROM ingredientes WHERE id=%s", (ing_id,))
+    row = c.fetchone()
     if not row:
+        c.close()
         conn.close()
         raise HTTPException(404, "Ingrediente no encontrado")
     campos = data.dict(exclude_none=True)
     if not campos:
+        c.close()
         conn.close()
         return dict(row)
-    sets = ", ".join(f"{k}=?" for k in campos)
-    sets += ", updated_at=datetime('now','localtime')"
+    sets = ", ".join(f"{k}=%s" for k in campos)
+    sets += ", updated_at=NOW()::text"
     vals = list(campos.values()) + [ing_id]
-    conn.execute(f"UPDATE ingredientes SET {sets} WHERE id=?", vals)
+    c.execute(f"UPDATE ingredientes SET {sets} WHERE id=%s RETURNING *", vals)
+    row = c.fetchone()
     conn.commit()
-    row = conn.execute("SELECT * FROM ingredientes WHERE id=?", (ing_id,)).fetchone()
+    c.close()
     conn.close()
     return dict(row)
 
 @app.delete("/ingredientes/{ing_id}", tags=["Ingredientes"], summary="Eliminar ingrediente")
 def eliminar_ingrediente(ing_id: int):
     conn = get_db()
-    en_uso = conn.execute(
-        "SELECT COUNT(*) FROM receta_ingredientes WHERE ingrediente_id=?", (ing_id,)
-    ).fetchone()[0]
+    c = conn.cursor()
+    c.execute("SELECT COUNT(*) FROM receta_ingredientes WHERE ingrediente_id=%s", (ing_id,))
+    en_uso = c.fetchone()["count"]
     if en_uso > 0:
+        c.close()
         conn.close()
         raise HTTPException(400, f"No se puede eliminar: el ingrediente se usa en {en_uso} receta(s)")
-    conn.execute("DELETE FROM ingredientes WHERE id=?", (ing_id,))
+    c.execute("DELETE FROM ingredientes WHERE id=%s", (ing_id,))
     conn.commit()
+    c.close()
     conn.close()
     return {"mensaje": "Ingrediente eliminado"}
 
@@ -384,42 +404,31 @@ def eliminar_ingrediente(ing_id: int):
 # RECETAS
 # ─────────────────────────────────────────
 
-def calcular_costo_receta(conn, receta_id):
-    """Calcula el costo total de una receta con los precios actuales."""
-    rows = conn.execute("""
-        SELECT ri.cantidad, i.precio
-        FROM receta_ingredientes ri
-        JOIN ingredientes i ON ri.ingrediente_id = i.id
-        WHERE ri.receta_id = ?
-    """, (receta_id,)).fetchall()
-    return sum((r["cantidad"] / 1000 if True else r["cantidad"]) * r["precio"]
-               for r in rows
-               if r["precio"] > 1)
-
 def calcular_costo_receta_v2(conn, receta_id):
-    """
-    Costo real: cantidad usada / 1000 * precio_por_kg  (si unidad es KG o LT)
-    Para huevos (UN): cantidad * precio_unitario
-    """
-    rows = conn.execute("""
+    c = conn.cursor()
+    c.execute("""
         SELECT ri.cantidad, i.precio, i.unidad
         FROM receta_ingredientes ri
         JOIN ingredientes i ON ri.ingrediente_id = i.id
-        WHERE ri.receta_id = ?
-    """, (receta_id,)).fetchall()
+        WHERE ri.receta_id = %s
+    """, (receta_id,))
+    rows = c.fetchall()
+    c.close()
     total = 0
     for r in rows:
         if r["unidad"] == "UN":
             total += r["cantidad"] * r["precio"]
         else:
-            # cantidad está en gramos/ml, precio por KG o LT
             total += (r["cantidad"] / 1000) * r["precio"]
     return round(total, 2)
 
 @app.get("/recetas", tags=["Recetas"], summary="Listar todas las recetas con costos calculados")
 def listar_recetas():
     conn = get_db()
-    recetas = conn.execute("SELECT * FROM recetas ORDER BY nombre").fetchall()
+    c = conn.cursor()
+    c.execute("SELECT * FROM recetas ORDER BY nombre")
+    recetas = c.fetchall()
+    c.close()
     resultado = []
     for r in recetas:
         costo = calcular_costo_receta_v2(conn, r["id"])
@@ -436,19 +445,24 @@ def listar_recetas():
 @app.get("/recetas/{receta_id}", tags=["Recetas"], summary="Detalle de receta con ingredientes")
 def obtener_receta(receta_id: int):
     conn = get_db()
-    r = conn.execute("SELECT * FROM recetas WHERE id=?", (receta_id,)).fetchone()
+    c = conn.cursor()
+    c.execute("SELECT * FROM recetas WHERE id=%s", (receta_id,))
+    r = c.fetchone()
     if not r:
+        c.close()
         conn.close()
         raise HTTPException(404, "Receta no encontrada")
-    ingredientes = conn.execute("""
+    c.execute("""
         SELECT ri.id, ri.cantidad, i.id as ingrediente_id, i.nombre, i.unidad, i.precio,
                CASE WHEN i.unidad='UN' THEN ri.cantidad * i.precio
                     ELSE (ri.cantidad / 1000.0) * i.precio END as costo_real
         FROM receta_ingredientes ri
         JOIN ingredientes i ON ri.ingrediente_id = i.id
-        WHERE ri.receta_id = ?
+        WHERE ri.receta_id = %s
         ORDER BY i.nombre
-    """, (receta_id,)).fetchall()
+    """, (receta_id,))
+    ingredientes = c.fetchall()
+    c.close()
     costo = calcular_costo_receta_v2(conn, receta_id)
     precio_final = round((costo + r["gastos_extra"]) * r["margen"], 2)
     conn.close()
@@ -463,72 +477,87 @@ def obtener_receta(receta_id: int):
 @app.post("/recetas", tags=["Recetas"], summary="Crear nueva receta")
 def crear_receta(data: RecetaCreate):
     conn = get_db()
+    c = conn.cursor()
     try:
-        conn.execute(
-            "INSERT INTO recetas (nombre, gastos_extra, margen, notas) VALUES (?,?,?,?)",
+        c.execute(
+            "INSERT INTO recetas (nombre, gastos_extra, margen, notas) VALUES (%s, %s, %s, %s) RETURNING id",
             (data.nombre, data.gastos_extra, data.margen, data.notas)
         )
+        receta_id = c.fetchone()["id"]
         conn.commit()
-        receta_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
-        row = conn.execute("SELECT * FROM recetas WHERE id=?", (receta_id,)).fetchone()
+        c.close()
         conn.close()
-        return {**dict(row), "costo_ingredientes": 0, "costo_total": 0, "precio_final": 0, "ingredientes": []}
+        return obtener_receta(receta_id)
     except Exception:
+        conn.rollback()
+        c.close()
         conn.close()
         raise HTTPException(400, f"Ya existe una receta con el nombre '{data.nombre}'")
 
 @app.put("/recetas/{receta_id}", tags=["Recetas"], summary="Actualizar receta")
 def actualizar_receta(receta_id: int, data: RecetaUpdate):
     conn = get_db()
-    row = conn.execute("SELECT * FROM recetas WHERE id=?", (receta_id,)).fetchone()
+    c = conn.cursor()
+    c.execute("SELECT * FROM recetas WHERE id=%s", (receta_id,))
+    row = c.fetchone()
     if not row:
+        c.close()
         conn.close()
         raise HTTPException(404, "Receta no encontrada")
     campos = data.dict(exclude_none=True)
     if campos:
-        sets = ", ".join(f"{k}=?" for k in campos)
+        sets = ", ".join(f"{k}=%s" for k in campos)
         vals = list(campos.values()) + [receta_id]
-        conn.execute(f"UPDATE recetas SET {sets} WHERE id=?", vals)
+        c.execute(f"UPDATE recetas SET {sets} WHERE id=%s", vals)
         conn.commit()
+    c.close()
     conn.close()
     return obtener_receta(receta_id)
 
 @app.delete("/recetas/{receta_id}", tags=["Recetas"])
 def eliminar_receta(receta_id: int):
     conn = get_db()
-    conn.execute("DELETE FROM receta_ingredientes WHERE receta_id=?", (receta_id,))
-    conn.execute("DELETE FROM recetas WHERE id=?", (receta_id,))
+    c = conn.cursor()
+    c.execute("DELETE FROM receta_ingredientes WHERE receta_id=%s", (receta_id,))
+    c.execute("DELETE FROM recetas WHERE id=%s", (receta_id,))
     conn.commit()
+    c.close()
     conn.close()
     return {"mensaje": "Receta eliminada"}
 
 @app.post("/recetas/{receta_id}/ingredientes", tags=["Recetas"], summary="Agregar ingrediente a receta")
 def agregar_ingrediente_receta(receta_id: int, item: RecetaIngredienteItem):
     conn = get_db()
-    conn.execute(
-        "INSERT INTO receta_ingredientes (receta_id, ingrediente_id, cantidad) VALUES (?,?,?)",
+    c = conn.cursor()
+    c.execute(
+        "INSERT INTO receta_ingredientes (receta_id, ingrediente_id, cantidad) VALUES (%s, %s, %s)",
         (receta_id, item.ingrediente_id, item.cantidad)
     )
     conn.commit()
+    c.close()
     conn.close()
     return obtener_receta(receta_id)
 
 @app.put("/recetas/{receta_id}/ingredientes/{ri_id}", tags=["Recetas"], summary="Actualizar cantidad de ingrediente")
 def actualizar_ingrediente_receta(receta_id: int, ri_id: int, item: RecetaIngredienteItem):
     conn = get_db()
-    conn.execute(
-        "UPDATE receta_ingredientes SET ingrediente_id=?, cantidad=? WHERE id=? AND receta_id=?",
+    c = conn.cursor()
+    c.execute(
+        "UPDATE receta_ingredientes SET ingrediente_id=%s, cantidad=%s WHERE id=%s AND receta_id=%s",
         (item.ingrediente_id, item.cantidad, ri_id, receta_id)
     )
     conn.commit()
+    c.close()
     conn.close()
     return obtener_receta(receta_id)
 
 @app.delete("/recetas/{receta_id}/ingredientes/{ri_id}", tags=["Recetas"], summary="Quitar ingrediente de receta")
 def quitar_ingrediente_receta(receta_id: int, ri_id: int):
     conn = get_db()
-    conn.execute("DELETE FROM receta_ingredientes WHERE id=? AND receta_id=?", (ri_id, receta_id))
+    c = conn.cursor()
+    c.execute("DELETE FROM receta_ingredientes WHERE id=%s AND receta_id=%s", (ri_id, receta_id))
     conn.commit()
+    c.close()
     conn.close()
     return obtener_receta(receta_id)
 
@@ -539,9 +568,14 @@ def quitar_ingrediente_receta(receta_id: int, ri_id: int):
 @app.get("/resumen", tags=["Estadísticas"])
 def resumen():
     conn = get_db()
-    total_ing = conn.execute("SELECT COUNT(*) FROM ingredientes").fetchone()[0]
-    total_rec = conn.execute("SELECT COUNT(*) FROM recetas").fetchone()[0]
-    recetas = conn.execute("SELECT id, nombre, gastos_extra, margen FROM recetas").fetchall()
+    c = conn.cursor()
+    c.execute("SELECT COUNT(*) FROM ingredientes")
+    total_ing = c.fetchone()["count"]
+    c.execute("SELECT COUNT(*) FROM recetas")
+    total_rec = c.fetchone()["count"]
+    c.execute("SELECT id, nombre, gastos_extra, margen FROM recetas")
+    recetas = c.fetchall()
+    c.close()
     productos = []
     for r in recetas:
         costo = calcular_costo_receta_v2(conn, r["id"])
@@ -558,16 +592,25 @@ def resumen():
 # BACKUP
 # ─────────────────────────────────────────
 
-@app.get("/backup", tags=["Admin"], summary="Descargar backup de la base de datos")
+@app.get("/backup", tags=["Admin"], summary="Exportar datos como JSON")
 def descargar_backup():
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT * FROM ingredientes ORDER BY nombre")
+    ingredientes = [dict(r) for r in c.fetchall()]
+    c.execute("SELECT * FROM recetas ORDER BY nombre")
+    recetas = [dict(r) for r in c.fetchall()]
+    c.execute("SELECT * FROM receta_ingredientes")
+    relaciones = [dict(r) for r in c.fetchall()]
+    c.close()
+    conn.close()
     from datetime import datetime
-    if not os.path.exists(DB_PATH):
-        raise HTTPException(404, "Base de datos no encontrada")
-    return FileResponse(
-        path=DB_PATH,
-        filename=f"pasteleria_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db",
-        media_type="application/octet-stream"
-    )
+    return {
+        "exportado_en": datetime.now().isoformat(),
+        "ingredientes": ingredientes,
+        "recetas": recetas,
+        "receta_ingredientes": relaciones,
+    }
 
 # ─────────────────────────────────────────
 # FRONTEND
@@ -577,5 +620,5 @@ app.mount("/static", StaticFiles(directory="frontend"), name="static")
 
 @app.get("/", response_class=HTMLResponse)
 def root():
-   with open("frontend/index.html", encoding="utf-8") as f:
+    with open("frontend/index.html", encoding="utf-8") as f:
         return f.read()
