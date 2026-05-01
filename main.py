@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -7,6 +7,8 @@ from typing import Optional
 import psycopg2
 import psycopg2.extras
 import os
+import hashlib
+import secrets
 
 app = FastAPI(title="Pastelería - Sistema de Costeo", version="1.0.0")
 
@@ -57,7 +59,32 @@ def init_db():
             cantidad        REAL NOT NULL
         )
     """)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS usuarios (
+            id          SERIAL PRIMARY KEY,
+            usuario     TEXT UNIQUE NOT NULL,
+            password    TEXT NOT NULL,
+            nombre      TEXT NOT NULL,
+            rol         TEXT DEFAULT 'usuario'
+        )
+    """)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS sesiones (
+            token       TEXT PRIMARY KEY,
+            usuario_id  INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE
+        )
+    """)
     conn.commit()
+
+    # Crear usuario admin por defecto si no existe
+    c.execute("SELECT COUNT(*) FROM usuarios")
+    if c.fetchone()["count"] == 0:
+        pwd_hash = hashlib.sha256("admin123".encode()).hexdigest()
+        c.execute(
+            "INSERT INTO usuarios (usuario, password, nombre, rol) VALUES (%s, %s, %s, %s)",
+            ("admin", pwd_hash, "Administrador", "admin")
+        )
+        conn.commit()
 
     # Cargar ingredientes si la tabla está vacía
     c.execute("SELECT COUNT(*) FROM ingredientes")
@@ -330,7 +357,8 @@ class RecetaIngredienteItem(BaseModel):
 # ─────────────────────────────────────────
 
 @app.get("/ingredientes", tags=["Ingredientes"])
-def listar_ingredientes():
+def listar_ingredientes(authorization: str = Header(None)):
+    verificar_token(authorization)
     conn = get_db()
     c = conn.cursor()
     c.execute("SELECT * FROM ingredientes ORDER BY nombre")
@@ -340,7 +368,8 @@ def listar_ingredientes():
     return [dict(r) for r in rows]
 
 @app.post("/ingredientes", tags=["Ingredientes"], summary="Crear nuevo ingrediente")
-def crear_ingrediente(data: IngredienteCreate):
+def crear_ingrediente(data: IngredienteCreate, authorization: str = Header(None)):
+    verificar_token(authorization)
     conn = get_db()
     c = conn.cursor()
     try:
@@ -360,7 +389,8 @@ def crear_ingrediente(data: IngredienteCreate):
         raise HTTPException(400, f"Ya existe un ingrediente con el nombre '{data.nombre}'")
 
 @app.put("/ingredientes/{ing_id}", tags=["Ingredientes"], summary="Actualizar ingrediente")
-def actualizar_ingrediente(ing_id: int, data: IngredienteUpdate):
+def actualizar_ingrediente(ing_id: int, data: IngredienteUpdate, authorization: str = Header(None)):
+    verificar_token(authorization)
     conn = get_db()
     c = conn.cursor()
     c.execute("SELECT * FROM ingredientes WHERE id=%s", (ing_id,))
@@ -385,7 +415,8 @@ def actualizar_ingrediente(ing_id: int, data: IngredienteUpdate):
     return dict(row)
 
 @app.delete("/ingredientes/{ing_id}", tags=["Ingredientes"], summary="Eliminar ingrediente")
-def eliminar_ingrediente(ing_id: int):
+def eliminar_ingrediente(ing_id: int, authorization: str = Header(None)):
+    verificar_token(authorization)
     conn = get_db()
     c = conn.cursor()
     c.execute("SELECT COUNT(*) FROM receta_ingredientes WHERE ingrediente_id=%s", (ing_id,))
@@ -423,7 +454,8 @@ def calcular_costo_receta_v2(conn, receta_id):
     return round(total, 2)
 
 @app.get("/recetas", tags=["Recetas"], summary="Listar todas las recetas con costos calculados")
-def listar_recetas():
+def listar_recetas(authorization: str = Header(None)):
+    verificar_token(authorization)
     conn = get_db()
     c = conn.cursor()
     c.execute("SELECT * FROM recetas ORDER BY nombre")
@@ -443,7 +475,8 @@ def listar_recetas():
     return resultado
 
 @app.get("/recetas/{receta_id}", tags=["Recetas"], summary="Detalle de receta con ingredientes")
-def obtener_receta(receta_id: int):
+def obtener_receta(receta_id: int, authorization: str = Header(None)):
+    verificar_token(authorization)
     conn = get_db()
     c = conn.cursor()
     c.execute("SELECT * FROM recetas WHERE id=%s", (receta_id,))
@@ -475,7 +508,8 @@ def obtener_receta(receta_id: int):
     }
 
 @app.post("/recetas", tags=["Recetas"], summary="Crear nueva receta")
-def crear_receta(data: RecetaCreate):
+def crear_receta(data: RecetaCreate, authorization: str = Header(None)):
+    verificar_token(authorization)
     conn = get_db()
     c = conn.cursor()
     try:
@@ -495,7 +529,8 @@ def crear_receta(data: RecetaCreate):
         raise HTTPException(400, f"Ya existe una receta con el nombre '{data.nombre}'")
 
 @app.put("/recetas/{receta_id}", tags=["Recetas"], summary="Actualizar receta")
-def actualizar_receta(receta_id: int, data: RecetaUpdate):
+def actualizar_receta(receta_id: int, data: RecetaUpdate, authorization: str = Header(None)):
+    verificar_token(authorization)
     conn = get_db()
     c = conn.cursor()
     c.execute("SELECT * FROM recetas WHERE id=%s", (receta_id,))
@@ -515,7 +550,8 @@ def actualizar_receta(receta_id: int, data: RecetaUpdate):
     return obtener_receta(receta_id)
 
 @app.delete("/recetas/{receta_id}", tags=["Recetas"])
-def eliminar_receta(receta_id: int):
+def eliminar_receta(receta_id: int, authorization: str = Header(None)):
+    verificar_token(authorization)
     conn = get_db()
     c = conn.cursor()
     c.execute("DELETE FROM receta_ingredientes WHERE receta_id=%s", (receta_id,))
@@ -526,7 +562,8 @@ def eliminar_receta(receta_id: int):
     return {"mensaje": "Receta eliminada"}
 
 @app.post("/recetas/{receta_id}/ingredientes", tags=["Recetas"], summary="Agregar ingrediente a receta")
-def agregar_ingrediente_receta(receta_id: int, item: RecetaIngredienteItem):
+def agregar_ingrediente_receta(receta_id: int, item: RecetaIngredienteItem, authorization: str = Header(None)):
+    verificar_token(authorization)
     conn = get_db()
     c = conn.cursor()
     c.execute(
@@ -539,7 +576,8 @@ def agregar_ingrediente_receta(receta_id: int, item: RecetaIngredienteItem):
     return obtener_receta(receta_id)
 
 @app.put("/recetas/{receta_id}/ingredientes/{ri_id}", tags=["Recetas"], summary="Actualizar cantidad de ingrediente")
-def actualizar_ingrediente_receta(receta_id: int, ri_id: int, item: RecetaIngredienteItem):
+def actualizar_ingrediente_receta(receta_id: int, ri_id: int, item: RecetaIngredienteItem, authorization: str = Header(None)):
+    verificar_token(authorization)
     conn = get_db()
     c = conn.cursor()
     c.execute(
@@ -552,7 +590,8 @@ def actualizar_ingrediente_receta(receta_id: int, ri_id: int, item: RecetaIngred
     return obtener_receta(receta_id)
 
 @app.delete("/recetas/{receta_id}/ingredientes/{ri_id}", tags=["Recetas"], summary="Quitar ingrediente de receta")
-def quitar_ingrediente_receta(receta_id: int, ri_id: int):
+def quitar_ingrediente_receta(receta_id: int, ri_id: int, authorization: str = Header(None)):
+    verificar_token(authorization)
     conn = get_db()
     c = conn.cursor()
     c.execute("DELETE FROM receta_ingredientes WHERE id=%s AND receta_id=%s", (ri_id, receta_id))
@@ -566,7 +605,8 @@ def quitar_ingrediente_receta(receta_id: int, ri_id: int):
 # ─────────────────────────────────────────
 
 @app.get("/resumen", tags=["Estadísticas"])
-def resumen():
+def resumen(authorization: str = Header(None)):
+    verificar_token(authorization)
     conn = get_db()
     c = conn.cursor()
     c.execute("SELECT COUNT(*) FROM ingredientes")
@@ -593,7 +633,8 @@ def resumen():
 # ─────────────────────────────────────────
 
 @app.get("/backup", tags=["Admin"], summary="Exportar datos como JSON")
-def descargar_backup():
+def descargar_backup(authorization: str = Header(None)):
+    verificar_token(authorization)
     conn = get_db()
     c = conn.cursor()
     c.execute("SELECT * FROM ingredientes ORDER BY nombre")
@@ -611,6 +652,126 @@ def descargar_backup():
         "recetas": recetas,
         "receta_ingredientes": relaciones,
     }
+
+# ─────────────────────────────────────────
+# AUTH
+# ─────────────────────────────────────────
+
+class LoginData(BaseModel):
+    usuario: str
+    password: str
+
+class UsuarioCreate(BaseModel):
+    usuario: str
+    password: str
+    nombre: str
+    rol: Optional[str] = "usuario"
+
+def hash_pwd(pwd: str) -> str:
+    return hashlib.sha256(pwd.encode()).hexdigest()
+
+def verificar_token(authorization: str = Header(None)):
+    if not authorization:
+        raise HTTPException(401, "No autorizado")
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("""
+        SELECT u.id, u.usuario, u.nombre, u.rol
+        FROM sesiones s JOIN usuarios u ON s.usuario_id = u.id
+        WHERE s.token = %s
+    """, (authorization,))
+    row = c.fetchone()
+    c.close()
+    conn.close()
+    if not row:
+        raise HTTPException(401, "Token inválido")
+    return dict(row)
+
+def verificar_admin(authorization: str = Header(None)):
+    u = verificar_token(authorization)
+    if u["rol"] != "admin":
+        raise HTTPException(403, "Se requiere rol admin")
+    return u
+
+@app.post("/login", tags=["Auth"])
+def login(data: LoginData):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT * FROM usuarios WHERE usuario=%s", (data.usuario,))
+    u = c.fetchone()
+    if not u or u["password"] != hash_pwd(data.password):
+        c.close()
+        conn.close()
+        raise HTTPException(401, "Usuario o contraseña incorrectos")
+    token = secrets.token_hex(32)
+    c.execute("INSERT INTO sesiones (token, usuario_id) VALUES (%s, %s)", (token, u["id"]))
+    conn.commit()
+    c.close()
+    conn.close()
+    return {
+        "token": token,
+        "usuario": {"id": u["id"], "usuario": u["usuario"], "nombre": u["nombre"], "rol": u["rol"]}
+    }
+
+@app.get("/usuarios", tags=["Usuarios"])
+def listar_usuarios(authorization: str = Header(None)):
+    verificar_admin(authorization)
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT id, usuario, nombre, rol FROM usuarios ORDER BY nombre")
+    rows = [dict(r) for r in c.fetchall()]
+    c.close()
+    conn.close()
+    return rows
+
+@app.post("/usuarios", tags=["Usuarios"])
+def crear_usuario(data: UsuarioCreate, authorization: str = Header(None)):
+    verificar_admin(authorization)
+    conn = get_db()
+    c = conn.cursor()
+    try:
+        c.execute(
+            "INSERT INTO usuarios (usuario, password, nombre, rol) VALUES (%s, %s, %s, %s) RETURNING id, usuario, nombre, rol",
+            (data.usuario, hash_pwd(data.password), data.nombre, data.rol)
+        )
+        row = dict(c.fetchone())
+        conn.commit()
+        c.close()
+        conn.close()
+        return row
+    except Exception:
+        conn.rollback()
+        c.close()
+        conn.close()
+        raise HTTPException(400, f"Ya existe un usuario con ese nombre")
+
+@app.delete("/usuarios/{usuario_id}", tags=["Usuarios"])
+def eliminar_usuario(usuario_id: int, authorization: str = Header(None)):
+    verificar_admin(authorization)
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT usuario FROM usuarios WHERE id=%s", (usuario_id,))
+    row = c.fetchone()
+    if not row:
+        c.close()
+        conn.close()
+        raise HTTPException(404, "Usuario no encontrado")
+    if row["usuario"] == "admin":
+        c.close()
+        conn.close()
+        raise HTTPException(400, "No se puede eliminar el usuario admin")
+    c.execute("DELETE FROM usuarios WHERE id=%s", (usuario_id,))
+    conn.commit()
+    c.close()
+    conn.close()
+    return {"mensaje": "Usuario eliminado"}
+
+# ─────────────────────────────────────────
+# PROTEGER ENDPOINTS CON TOKEN
+# ─────────────────────────────────────────
+
+# Agrega verificación de token a todos los endpoints que lo necesiten
+# usando el Header Authorization
 
 # ─────────────────────────────────────────
 # FRONTEND

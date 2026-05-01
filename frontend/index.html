@@ -22,6 +22,77 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: var(--crema); font-family: 'DM Sans', sans-serif; color: var(--texto); min-height: 100vh; }
 
+  /* LOGIN */
+  #login-screen {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--crema);
+  }
+  .login-box {
+    background: var(--blanco);
+    border-radius: 20px;
+    box-shadow: 0 8px 40px rgba(92,61,46,0.14);
+    padding: 40px 36px;
+    width: 100%;
+    max-width: 380px;
+  }
+  .login-box .login-logo {
+    text-align: center;
+    margin-bottom: 28px;
+  }
+  .login-box .login-logo .emoji { font-size: 3rem; display: block; margin-bottom: 10px; }
+  .login-box .login-logo h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.6rem;
+    color: var(--marron);
+    margin-bottom: 4px;
+  }
+  .login-box .login-logo span { font-size: 0.85rem; color: var(--gris); font-style: italic; }
+  .login-field { margin-bottom: 16px; }
+  .login-field label { display: block; font-size: 0.78rem; color: var(--gris); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+  .login-field input {
+    width: 100%;
+    border: 1.5px solid #e8d8cc;
+    border-radius: 10px;
+    padding: 11px 14px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.95rem;
+    background: var(--crema);
+    color: var(--texto);
+    transition: border-color 0.2s;
+  }
+  .login-field input:focus { outline: none; border-color: var(--rosa); background: var(--blanco); }
+  .btn-login {
+    width: 100%;
+    background: var(--marron);
+    color: var(--crema);
+    border: none;
+    border-radius: 10px;
+    padding: 13px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: background 0.2s;
+  }
+  .btn-login:hover { background: var(--marron-claro); }
+  .login-error {
+    background: #fce8e4;
+    color: var(--rosa-oscuro);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 0.88rem;
+    margin-top: 14px;
+    display: none;
+    text-align: center;
+  }
+
+  /* APP (oculto hasta login) */
+  #app-screen { display: none; }
+
   /* HEADER */
   header {
     background: var(--marron);
@@ -37,6 +108,27 @@
   }
   header h1 { font-family: 'Playfair Display', serif; font-size: 1.4rem; font-weight: 700; letter-spacing: 0.02em; }
   header span { font-size: 0.8rem; color: var(--rosa); font-style: italic; }
+  .header-user {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .header-user .usuario-badge {
+    font-size: 0.82rem;
+    color: rgba(253,246,238,0.7);
+  }
+  .btn-logout {
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: var(--crema);
+    border-radius: 8px;
+    padding: 5px 12px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-family: 'DM Sans', sans-serif;
+    transition: background 0.2s;
+  }
+  .btn-logout:hover { background: rgba(255,255,255,0.2); }
 
   /* NAV */
   nav {
@@ -382,6 +474,21 @@
     right: 16px;
   }
 
+  /* USUARIOS (solo admin) */
+  .usuarios-section { margin-top: 32px; }
+  .usuario-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--blanco);
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(92,61,46,0.06);
+    margin-bottom: 8px;
+  }
+  .usuario-row .u-nombre { flex: 1; font-weight: 500; }
+  .usuario-row .u-rol { font-size: 0.78rem; color: var(--gris); background: var(--crema); padding: 2px 10px; border-radius: 20px; }
+
   @media (max-width: 600px) {
     header h1 { font-size: 1.1rem; }
     .recetas-grid { grid-template-columns: 1fr; }
@@ -391,22 +498,52 @@
 </head>
 <body>
 
-<header>
-  <div>
-    <h1>🧁 Pastelería</h1>
-    <span>Sistema de costeo</span>
+<!-- PANTALLA DE LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">
+      <span class="emoji">🧁</span>
+      <h2>Pastelería</h2>
+      <span>Sistema de costeo</span>
+    </div>
+    <div class="login-field">
+      <label>Usuario</label>
+      <input type="text" id="login-usuario" placeholder="Tu usuario" autocomplete="username"
+        onkeydown="if(event.key==='Enter') document.getElementById('login-pass').focus()"/>
+    </div>
+    <div class="login-field">
+      <label>Contraseña</label>
+      <input type="password" id="login-pass" placeholder="Tu contraseña" autocomplete="current-password"
+        onkeydown="if(event.key==='Enter') hacerLogin()"/>
+    </div>
+    <button class="btn-login" onclick="hacerLogin()">Ingresar</button>
+    <div class="login-error" id="login-error">Usuario o contraseña incorrectos</div>
   </div>
-</header>
+</div>
 
-<nav>
-  <button class="active" onclick="showTab('resumen')">📊 Resumen</button>
-  <button onclick="showTab('ingredientes')">🥚 Ingredientes</button>
-  <button onclick="showTab('recetas')">📋 Recetas</button>
-</nav>
+<!-- APP PRINCIPAL -->
+<div id="app-screen">
+  <header>
+    <div>
+      <h1>🧁 Pastelería</h1>
+      <span>Sistema de costeo</span>
+    </div>
+    <div class="header-user">
+      <span class="usuario-badge" id="usuario-badge"></span>
+      <button class="btn-logout" onclick="cerrarSesion()">Salir</button>
+    </div>
+  </header>
 
-<main id="app">
-  <div class="loading">Cargando...</div>
-</main>
+  <nav id="nav-bar">
+    <button class="active" onclick="showTab('resumen')">📊 Resumen</button>
+    <button onclick="showTab('ingredientes')">🥚 Ingredientes</button>
+    <button onclick="showTab('recetas')">📋 Recetas</button>
+  </nav>
+
+  <main id="app">
+    <div class="loading">Cargando...</div>
+  </main>
+</div>
 
 <div class="toast" id="toast"></div>
 
@@ -416,7 +553,78 @@ let ingredientes = [];
 let recetas = [];
 let tabActual = 'resumen';
 let recetaDetalle = null;
+let usuarioActual = null;
+let tokenActual = null;
 
+// ── AUTH ──
+async function hacerLogin() {
+  const usuario = document.getElementById('login-usuario').value.trim();
+  const password = document.getElementById('login-pass').value;
+  if (!usuario || !password) return;
+
+  const r = await fetch('/login', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ usuario, password })
+  });
+  const data = await r.json();
+
+  if (!r.ok || data.detail) {
+    document.getElementById('login-error').style.display = 'block';
+    return;
+  }
+
+  tokenActual = data.token;
+  usuarioActual = data.usuario;
+  sessionStorage.setItem('token', tokenActual);
+  sessionStorage.setItem('usuario', JSON.stringify(usuarioActual));
+  mostrarApp();
+}
+
+function cerrarSesion() {
+  sessionStorage.removeItem('token');
+  sessionStorage.removeItem('usuario');
+  tokenActual = null;
+  usuarioActual = null;
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('app-screen').style.display = 'none';
+  document.getElementById('login-pass').value = '';
+  document.getElementById('login-error').style.display = 'none';
+}
+
+async function mostrarApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app-screen').style.display = 'block';
+  document.getElementById('usuario-badge').textContent = usuarioActual.nombre + (usuarioActual.rol === 'admin' ? ' (admin)' : '');
+
+  // Mostrar tab de usuarios solo para admin
+  const nav = document.getElementById('nav-bar');
+  if (usuarioActual.rol === 'admin') {
+    if (!document.getElementById('btn-tab-usuarios')) {
+      const btn = document.createElement('button');
+      btn.id = 'btn-tab-usuarios';
+      btn.textContent = '👤 Usuarios';
+      btn.onclick = () => showTab('usuarios');
+      nav.appendChild(btn);
+    }
+  }
+
+  await cargarDatos();
+  render();
+}
+
+// Verificar sesión guardada al cargar
+window.addEventListener('load', () => {
+  const token = sessionStorage.getItem('token');
+  const usuario = sessionStorage.getItem('usuario');
+  if (token && usuario) {
+    tokenActual = token;
+    usuarioActual = JSON.parse(usuario);
+    mostrarApp();
+  }
+});
+
+// ── HELPERS HTTP (con token) ──
 function fmt(n) {
   return '$' + Math.round(n).toLocaleString('es-AR');
 }
@@ -429,20 +637,28 @@ function toast(msg, color = '#7a9e7e') {
   setTimeout(() => t.classList.remove('show'), 2500);
 }
 
+function headers() {
+  return {'Content-Type': 'application/json', 'Authorization': tokenActual || ''};
+}
+
 async function get(url) {
-  const r = await fetch(API + url);
+  const r = await fetch(API + url, { headers: headers() });
+  if (r.status === 401) { cerrarSesion(); return {}; }
   return r.json();
 }
 async function put(url, body) {
-  const r = await fetch(API + url, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  const r = await fetch(API + url, { method: 'PUT', headers: headers(), body: JSON.stringify(body) });
+  if (r.status === 401) { cerrarSesion(); return {}; }
   return r.json();
 }
 async function post(url, body) {
-  const r = await fetch(API + url, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  const r = await fetch(API + url, { method: 'POST', headers: headers(), body: JSON.stringify(body) });
+  if (r.status === 401) { cerrarSesion(); return {}; }
   return r.json();
 }
 async function del(url) {
-  const r = await fetch(API + url, { method: 'DELETE' });
+  const r = await fetch(API + url, { method: 'DELETE', headers: headers() });
+  if (r.status === 401) { cerrarSesion(); return {}; }
   return r.json();
 }
 
@@ -453,8 +669,10 @@ async function cargarDatos() {
 function showTab(tab) {
   tabActual = tab;
   recetaDetalle = null;
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  const tabs = ['resumen','ingredientes','recetas','usuarios'];
   document.querySelectorAll('nav button').forEach((b,i) => {
-    b.classList.toggle('active', ['resumen','ingredientes','recetas'][i] === tab);
+    if (tabs[i] === tab) b.classList.add('active');
   });
   render();
 }
@@ -467,6 +685,7 @@ async function render() {
     if (recetaDetalle) renderDetalle(app);
     else renderRecetas(app);
   }
+  else if (tabActual === 'usuarios') renderUsuarios(app);
 }
 
 // ── RESUMEN ──
@@ -508,8 +727,6 @@ let ingEditandoId = null;
 function renderIngredientes(app) {
   app.innerHTML = `
     <div class="sec-title">Ingredientes</div>
-
-    <!-- FORMULARIO NUEVO / EDITAR -->
     <div class="nueva-receta-form" id="form-ing">
       <div><label>Nombre</label><input type="text" id="ing-nombre" placeholder="Ej: Manteca"/></div>
       <div>
@@ -524,7 +741,6 @@ function renderIngredientes(app) {
       <button class="btn-primary" onclick="guardarIngrediente()">+ Agregar</button>
       <button class="btn-secondary" id="btn-cancelar-ing" style="display:none" onclick="cancelarEdicion()">Cancelar</button>
     </div>
-
     <input class="search-box" type="text" placeholder="🔍 Buscar ingrediente..." oninput="filtrarIng(this.value)"/>
     <div class="ing-list" id="ing-list">
       ${renderIngList(ingredientes)}
@@ -546,7 +762,7 @@ function renderIngList(lista) {
       <button onclick="editarIngrediente(${ing.id})" title="Editar"
         style="background:var(--crema);border:none;border-radius:8px;padding:5px 10px;cursor:pointer;color:var(--marron-claro);font-size:0.9rem;">✏️</button>
       <button onclick="eliminarIngrediente(${ing.id}, '${ing.nombre}')" title="Eliminar"
-        style="background:none;border:none;cursor:pointer;color:var(--rosa);font-size:1rem;padding:5px 8px;border-radius:6px;" >🗑️</button>
+        style="background:none;border:none;cursor:pointer;color:var(--rosa);font-size:1rem;padding:5px 8px;border-radius:6px;">🗑️</button>
     </div>
   `).join('');
 }
@@ -585,7 +801,6 @@ async function guardarIngrediente() {
   if (isNaN(precio) || precio < 0) { toast('Precio inválido', '#e8a598'); return; }
 
   if (ingEditandoId) {
-    // MODIFICAR
     const r = await put(`/ingredientes/${ingEditandoId}`, { nombre, unidad, precio });
     if (r.detail) { toast(r.detail, '#e8a598'); return; }
     const idx = ingredientes.findIndex(i => i.id === ingEditandoId);
@@ -595,7 +810,6 @@ async function guardarIngrediente() {
     document.getElementById('ing-list').innerHTML = renderIngList(ingredientes);
     toast('✓ Ingrediente actualizado');
   } else {
-    // CREAR
     const r = await post('/ingredientes', { nombre, unidad, precio });
     if (r.detail) { toast(r.detail, '#e8a598'); return; }
     ingredientes.push(r);
@@ -689,13 +903,11 @@ async function renderDetalle(app) {
         🗑️ Eliminar receta
       </button>
     </div>
-
     <div class="config-receta">
       <div><label>Gastos extra ($)</label><input type="number" id="cfg-gastos" value="${r.gastos_extra}"/></div>
       <div><label>Margen (x)</label><input type="number" id="cfg-margen" value="${r.margen}" step="0.1"/></div>
       <button class="btn-primary" onclick="guardarConfig(${r.id})">Guardar</button>
     </div>
-
     <div class="detalle-resumen">
       <div class="detalle-stat"><div class="num">${fmt(r.costo_ingredientes)}</div><div class="lbl">Ingredientes</div></div>
       <div class="detalle-stat"><div class="num">${fmt(r.gastos_extra)}</div><div class="lbl">Gastos extra</div></div>
@@ -705,12 +917,10 @@ async function renderDetalle(app) {
         <div class="lbl" style="color:rgba(255,255,255,0.7)">Precio final</div>
       </div>
     </div>
-
     <div class="sec-title">Ingredientes</div>
     <div id="ing-detalle">
       ${renderIngDetalle(r.ingredientes)}
     </div>
-
     <div class="add-ing-form">
       <div>
         <label>Ingrediente</label>
@@ -784,11 +994,57 @@ async function eliminarReceta(id, nombre) {
   toast('Receta eliminada', '#c97b6e');
 }
 
-// INICIO
-(async () => {
-  await cargarDatos();
-  render();
-})();
+// ── USUARIOS (solo admin) ──
+async function renderUsuarios(app) {
+  const data = await get('/usuarios');
+  if (data.detail) { app.innerHTML = '<div class="loading">Sin acceso</div>'; return; }
+  app.innerHTML = `
+    <div class="sec-title">Usuarios</div>
+    <div class="nueva-receta-form">
+      <div><label>Usuario</label><input type="text" id="nu-usuario" placeholder="Ej: maria"/></div>
+      <div><label>Contraseña</label><input type="password" id="nu-pass" placeholder="Contraseña"/></div>
+      <div><label>Nombre</label><input type="text" id="nu-nombre" placeholder="Ej: María García"/></div>
+      <div>
+        <label>Rol</label>
+        <select id="nu-rol" style="border:1.5px solid #e8d8cc;border-radius:8px;padding:8px 12px;font-family:'DM Sans',sans-serif;font-size:0.9rem;background:var(--crema);color:var(--texto);">
+          <option value="usuario">Usuario</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+      <button class="btn-primary" onclick="crearUsuario()">+ Crear usuario</button>
+    </div>
+    <div>
+      ${data.map(u => `
+        <div class="usuario-row">
+          <span class="u-nombre">${u.nombre} <span style="color:var(--gris);font-size:0.85rem">(${u.usuario})</span></span>
+          <span class="u-rol">${u.rol}</span>
+          ${u.usuario !== 'admin' ? `<button onclick="eliminarUsuario(${u.id}, '${u.nombre}')"
+            style="background:none;border:none;cursor:pointer;color:var(--rosa);font-size:1rem;padding:5px 8px;border-radius:6px;">🗑️</button>` : ''}
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+async function crearUsuario() {
+  const usuario = document.getElementById('nu-usuario').value.trim();
+  const password = document.getElementById('nu-pass').value;
+  const nombre = document.getElementById('nu-nombre').value.trim();
+  const rol = document.getElementById('nu-rol').value;
+  if (!usuario || !password || !nombre) { toast('Completá todos los campos', '#e8a598'); return; }
+  const r = await post('/usuarios', { usuario, password, nombre, rol });
+  if (r.detail) { toast(r.detail, '#e8a598'); return; }
+  toast('✓ Usuario creado');
+  renderUsuarios(document.getElementById('app'));
+}
+
+async function eliminarUsuario(id, nombre) {
+  if (!confirm(`¿Eliminar usuario "${nombre}"?`)) return;
+  const r = await del(`/usuarios/${id}`);
+  if (r.detail) { toast(r.detail, '#e8a598'); return; }
+  toast('Usuario eliminado', '#c97b6e');
+  renderUsuarios(document.getElementById('app'));
+}
 </script>
 </body>
 </html>
