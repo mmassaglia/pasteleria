@@ -309,20 +309,92 @@
   .detalle-stat .lbl { font-size: 0.75rem; color: var(--gris); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 4px; }
 
   .ing-detalle-row {
+    background: var(--crema);
+    border-radius: 12px;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+    border: 1.5px solid transparent;
+    transition: border-color 0.2s;
+    overflow: hidden;
+  }
+  .ing-detalle-row:hover { border-color: #e8d8cc; }
+  .ing-detalle-row.editando { border-color: var(--rosa); background: var(--blanco); }
+
+  /* Fila vista (compacta) */
+  .ing-row-vista {
     display: flex;
     align-items: center;
     gap: 10px;
     padding: 10px 14px;
-    background: var(--crema);
-    border-radius: 10px;
-    margin-bottom: 8px;
-    font-size: 0.9rem;
   }
-  .ing-detalle-row .nombre { flex: 1; font-weight: 500; }
-  .ing-detalle-row .cant { color: var(--gris); font-size: 0.82rem; min-width: 80px; }
-  .ing-detalle-row .costo { font-weight: 600; color: var(--marron-claro); min-width: 80px; text-align: right; }
-  .ing-detalle-row .btn-del { background: none; border: none; color: #e8a598; cursor: pointer; font-size: 1.1rem; padding: 2px 6px; border-radius: 6px; transition: background 0.15s; }
-  .ing-detalle-row .btn-del:hover { background: #fce8e4; color: var(--rosa-oscuro); }
+  .ing-row-vista .nombre { flex: 1; font-weight: 500; }
+  .ing-row-vista .cant { color: var(--gris); font-size: 0.82rem; min-width: 70px; }
+  .ing-row-vista .costo { font-weight: 600; color: var(--marron-claro); min-width: 70px; text-align: right; }
+  .btn-editar-ing {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 0.85rem;
+    padding: 3px 8px;
+    border-radius: 6px;
+    color: var(--marron-claro);
+    transition: background 0.15s;
+  }
+  .btn-editar-ing:hover { background: #f0e4d8; }
+  .btn-del { background: none; border: none; color: #e8a598; cursor: pointer; font-size: 1.1rem; padding: 2px 6px; border-radius: 6px; transition: background 0.15s; }
+  .btn-del:hover { background: #fce8e4; color: var(--rosa-oscuro); }
+
+  /* Panel de edición (expandible) */
+  .ing-row-edit {
+    display: none;
+    padding: 10px 14px 14px;
+    border-top: 1px solid #f0e4d8;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+  }
+  .ing-detalle-row.editando .ing-row-edit { display: flex; }
+  .ing-row-edit label { font-size: 0.72rem; color: var(--gris); text-transform: uppercase; letter-spacing: 0.04em; display: block; margin-bottom: 3px; }
+  .ing-row-edit select,
+  .ing-row-edit input {
+    border: 1.5px solid #e8d8cc;
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.88rem;
+    background: var(--crema);
+    color: var(--texto);
+    transition: border-color 0.2s;
+  }
+  .ing-row-edit select:focus,
+  .ing-row-edit input:focus { outline: none; border-color: var(--rosa); background: var(--blanco); }
+  .ing-row-edit select { min-width: 160px; }
+  .ing-row-edit input { width: 100px; }
+  .btn-save-ing {
+    background: var(--marron);
+    color: var(--crema);
+    border: none;
+    border-radius: 8px;
+    padding: 7px 14px;
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-weight: 600;
+    font-family: 'DM Sans', sans-serif;
+    transition: background 0.2s;
+  }
+  .btn-save-ing:hover { background: var(--marron-claro); }
+  .btn-cancel-ing {
+    background: none;
+    border: 1px solid #e8d8cc;
+    color: var(--gris);
+    border-radius: 8px;
+    padding: 7px 12px;
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-family: 'DM Sans', sans-serif;
+    transition: all 0.2s;
+  }
+  .btn-cancel-ing:hover { border-color: var(--rosa); color: var(--rosa-oscuro); }
 
   /* AGREGAR INGREDIENTE */
   .add-ing-form {
@@ -1057,13 +1129,66 @@ async function renderDetalle(app) {
 function renderIngDetalle(lista) {
   if (!lista.length) return '<div style="color:var(--gris);font-style:italic;padding:12px">Sin ingredientes aún</div>';
   return lista.map(i => `
-    <div class="ing-detalle-row">
-      <span class="nombre">${i.nombre}</span>
-      <span class="cant">${i.cantidad} ${i.unidad === 'UN' ? 'un.' : 'g/ml'}</span>
-      <span class="costo">${fmt(i.costo_real)}</span>
-      <button class="btn-del" onclick="quitarIngrediente(${recetaDetalle.id}, ${i.id})" title="Quitar">✕</button>
+    <div class="ing-detalle-row" id="ing-edit-row-${i.id}">
+      <div class="ing-row-vista">
+        <span class="nombre">${i.nombre}</span>
+        <span class="cant">${i.cantidad} ${i.unidad === 'UN' ? 'un.' : 'g/ml'}</span>
+        <span class="costo">${fmt(i.costo_real)}</span>
+        <button class="btn-editar-ing" onclick="toggleEditIng(${i.id})" title="Editar">✏️</button>
+        <button class="btn-del" onclick="quitarIngrediente(${recetaDetalle.id}, ${i.id})" title="Quitar">✕</button>
+      </div>
+      <div class="ing-row-edit">
+        <div>
+          <label>Ingrediente</label>
+          <select id="edit-ing-sel-${i.id}">
+            ${ingredientes.map(ing => `<option value="${ing.id}" ${ing.id === i.ingrediente_id ? 'selected' : ''}>${ing.nombre} (${ing.unidad})</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label>Cantidad</label>
+          <input type="number" id="edit-ing-cant-${i.id}" value="${i.cantidad}" min="0" step="any"/>
+        </div>
+        <div>
+          <label>Precio del ing. ($)</label>
+          <input type="number" id="edit-ing-precio-${i.id}" value="${i.precio_unitario || ''}" placeholder="Precio/kg o unid"/>
+        </div>
+        <button class="btn-save-ing" onclick="guardarEdicionIng(${recetaDetalle.id}, ${i.id})">✓ Guardar</button>
+        <button class="btn-cancel-ing" onclick="toggleEditIng(${i.id})">Cancelar</button>
+      </div>
     </div>
   `).join('');
+}
+
+function toggleEditIng(riId) {
+  const row = document.getElementById(`ing-edit-row-${riId}`);
+  if (!row) return;
+  row.classList.toggle('editando');
+}
+
+async function guardarEdicionIng(recetaId, riId) {
+  const ing_id = parseInt(document.getElementById(`edit-ing-sel-${riId}`).value);
+  const cantidad = parseFloat(document.getElementById(`edit-ing-cant-${riId}`).value);
+  const precioInput = document.getElementById(`edit-ing-precio-${riId}`).value;
+
+  if (isNaN(cantidad) || cantidad <= 0) { toast('Cantidad inválida', '#e8a598'); return; }
+
+  // Si cambió el precio del ingrediente base, actualizarlo primero
+  if (precioInput !== '') {
+    const precio = parseFloat(precioInput);
+    if (!isNaN(precio) && precio >= 0) {
+      await put(`/ingredientes/${ing_id}`, { precio });
+      const idx = ingredientes.findIndex(i => i.id === ing_id);
+      if (idx >= 0) ingredientes[idx].precio = precio;
+    }
+  }
+
+  // Quitar el ingrediente anterior y agregar el nuevo (con posible cambio de ing)
+  await del(`/recetas/${recetaId}/ingredientes/${riId}`);
+  const data = await post(`/recetas/${recetaId}/ingredientes`, { ingrediente_id: ing_id, cantidad });
+  recetaDetalle = data;
+  recetas = await get('/recetas');
+  render();
+  toast('✓ Ingrediente actualizado');
 }
 
 async function guardarConfig(recetaId) {
