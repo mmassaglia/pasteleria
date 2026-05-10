@@ -461,6 +461,98 @@
   /* LOADING */
   .loading { text-align: center; padding: 40px; color: var(--gris); font-style: italic; }
 
+  /* RECETA SEARCH */
+  .recetas-search {
+    width: 100%;
+    border: 1.5px solid #e8d8cc;
+    border-radius: 12px;
+    padding: 10px 16px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.95rem;
+    background: var(--blanco);
+    color: var(--texto);
+    margin-bottom: 16px;
+    transition: border-color 0.2s;
+  }
+  .recetas-search:focus { outline: none; border-color: var(--rosa); }
+
+  /* BOTÓN DUPLICAR */
+  .btn-duplicar {
+    background: var(--crema);
+    border: 1.5px solid #e8d8cc;
+    color: var(--marron-claro);
+    border-radius: 8px;
+    padding: 5px 12px;
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-weight: 600;
+    font-family: 'DM Sans', sans-serif;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .btn-duplicar:hover { background: #f0e4d8; border-color: var(--rosa); color: var(--marron); }
+
+  /* EDIT INLINE NOMBRE */
+  .edit-nombre-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+  }
+  .input-nombre-receta {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.5rem;
+    color: var(--marron);
+    border: 1.5px solid transparent;
+    border-radius: 8px;
+    padding: 2px 8px;
+    background: transparent;
+    width: 100%;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .input-nombre-receta:focus { outline: none; border-color: var(--rosa); background: var(--blanco); }
+  .btn-save-nombre {
+    background: var(--verde);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 5px 12px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 600;
+    font-family: 'DM Sans', sans-serif;
+    display: none;
+    transition: background 0.2s;
+  }
+  .btn-save-nombre:hover { background: #5e8462; }
+
+  /* NOTAS EN DETALLE */
+  .notas-detalle {
+    margin-bottom: 16px;
+  }
+  .notas-detalle label {
+    font-size: 0.78rem;
+    color: var(--gris);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: block;
+    margin-bottom: 6px;
+  }
+  .notas-detalle textarea {
+    width: 100%;
+    border: 1.5px solid #e8d8cc;
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.9rem;
+    background: var(--crema);
+    color: var(--texto);
+    resize: vertical;
+    min-height: 60px;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .notas-detalle textarea:focus { outline: none; border-color: var(--rosa); background: var(--blanco); }
+
   /* MARGEN EDITABLE */
   .margen-tag {
     background: var(--amarillo);
@@ -843,6 +935,31 @@ async function eliminarIngrediente(id, nombre) {
 }
 
 // ── RECETAS ──
+function renderRecetasGrid(lista) {
+  if (!lista.length) return '<div class="loading">No se encontraron recetas</div>';
+  return lista.map(r => `
+    <div class="receta-card" onclick="abrirDetalle(${r.id})">
+      <span class="margen-tag">x${r.margen}</span>
+      <h3>${r.nombre}</h3>
+      ${r.notas ? `<div class="notas">${r.notas}</div>` : ''}
+      <div class="receta-nums">
+        <div class="receta-num-row"><span class="lbl">Ingredientes</span><span class="val">${fmt(r.costo_ingredientes)}</span></div>
+        <div class="receta-num-row"><span class="lbl">Gastos extra</span><span class="val">${fmt(r.gastos_extra)}</span></div>
+        <div class="receta-num-row"><span class="lbl">Costo total</span><span class="val">${fmt(r.costo_total)}</span></div>
+      </div>
+      <div class="precio-final-badge">
+        <span class="lbl">Precio sugerido</span>
+        <span class="val">${fmt(r.precio_final)}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function filtrarRecetas(q) {
+  const lista = recetas.filter(r => r.nombre.toLowerCase().includes(q.toLowerCase()));
+  document.getElementById('recetas-grid').innerHTML = renderRecetasGrid(lista);
+}
+
 function renderRecetas(app) {
   app.innerHTML = `
     <div class="sec-title">Recetas</div>
@@ -852,23 +969,9 @@ function renderRecetas(app) {
       <div><label>Margen (x)</label><input type="number" id="nueva-margen" value="3" step="0.1"/></div>
       <button class="btn-primary" onclick="crearReceta()">+ Nueva receta</button>
     </div>
-    <div class="recetas-grid">
-      ${recetas.map(r => `
-        <div class="receta-card" onclick="abrirDetalle(${r.id})">
-          <span class="margen-tag">x${r.margen}</span>
-          <h3>${r.nombre}</h3>
-          ${r.notas ? `<div class="notas">${r.notas}</div>` : ''}
-          <div class="receta-nums">
-            <div class="receta-num-row"><span class="lbl">Ingredientes</span><span class="val">${fmt(r.costo_ingredientes)}</span></div>
-            <div class="receta-num-row"><span class="lbl">Gastos extra</span><span class="val">${fmt(r.gastos_extra)}</span></div>
-            <div class="receta-num-row"><span class="lbl">Costo total</span><span class="val">${fmt(r.costo_total)}</span></div>
-          </div>
-          <div class="precio-final-badge">
-            <span class="lbl">Precio sugerido</span>
-            <span class="val">${fmt(r.precio_final)}</span>
-          </div>
-        </div>
-      `).join('')}
+    <input class="recetas-search" type="text" placeholder="🔍 Buscar receta..." oninput="filtrarRecetas(this.value)"/>
+    <div class="recetas-grid" id="recetas-grid">
+      ${renderRecetasGrid(recetas)}
     </div>
   `;
 }
@@ -898,12 +1001,24 @@ async function renderDetalle(app) {
   app.innerHTML = `
     <div class="detalle-header">
       <button class="btn-back" onclick="volverRecetas()">← Volver</button>
-      <span class="detalle-titulo">${r.nombre}</span>
-      <button onclick="eliminarReceta(${r.id}, '${r.nombre}')"
-        style="margin-left:auto;background:#fce8e4;border:none;border-radius:10px;padding:8px 16px;cursor:pointer;color:var(--rosa-oscuro);font-weight:600;font-size:0.88rem;transition:background 0.2s;"
-        onmouseover="this.style.background='#f8d0c8'" onmouseout="this.style.background='#fce8e4'">
-        🗑️ Eliminar receta
-      </button>
+      <div class="edit-nombre-wrap">
+        <input class="input-nombre-receta" id="input-nombre-receta" type="text" value="${r.nombre}"
+          oninput="document.getElementById('btn-save-nombre').style.display='inline-block'"
+          onkeydown="if(event.key==='Enter') guardarNombreReceta(${r.id})"/>
+        <button class="btn-save-nombre" id="btn-save-nombre" onclick="guardarNombreReceta(${r.id})">✓ Guardar</button>
+      </div>
+      <div style="display:flex;gap:8px;margin-left:auto;">
+        <button class="btn-duplicar" onclick="duplicarReceta(${r.id}, '${r.nombre.replace(/'/g,"\\'")}')">📋 Duplicar</button>
+        <button onclick="eliminarReceta(${r.id}, '${r.nombre.replace(/'/g,"\\'")}' )"
+          style="background:#fce8e4;border:none;border-radius:10px;padding:8px 16px;cursor:pointer;color:var(--rosa-oscuro);font-weight:600;font-size:0.88rem;transition:background 0.2s;"
+          onmouseover="this.style.background='#f8d0c8'" onmouseout="this.style.background='#fce8e4'">
+          🗑️ Eliminar
+        </button>
+      </div>
+    </div>
+    <div class="notas-detalle">
+      <label>📝 Notas / descripción</label>
+      <textarea id="cfg-notas" placeholder="Ej: Para 12 porciones, guardar en heladera...">${r.notas || ''}</textarea>
     </div>
     <div class="config-receta">
       <div><label>Gastos extra ($)</label><input type="number" id="cfg-gastos" value="${r.gastos_extra}"/></div>
@@ -954,7 +1069,8 @@ function renderIngDetalle(lista) {
 async function guardarConfig(recetaId) {
   const gastos = parseFloat(document.getElementById('cfg-gastos').value);
   const margen = parseFloat(document.getElementById('cfg-margen').value);
-  const data = await put(`/recetas/${recetaId}`, { gastos_extra: gastos, margen });
+  const notas = document.getElementById('cfg-notas').value.trim();
+  const data = await put(`/recetas/${recetaId}`, { gastos_extra: gastos, margen, notas });
   recetaDetalle = data;
   recetas = await get('/recetas');
   render();
@@ -978,6 +1094,41 @@ async function quitarIngrediente(recetaId, riId) {
   recetas = await get('/recetas');
   render();
   toast('Ingrediente quitado', '#c97b6e');
+}
+
+async function guardarNombreReceta(recetaId) {
+  const nombre = document.getElementById('input-nombre-receta').value.trim();
+  if (!nombre) { toast('El nombre no puede estar vacío', '#e8a598'); return; }
+  const data = await put(`/recetas/${recetaId}`, { nombre });
+  if (data.detail) { toast(data.detail, '#e8a598'); return; }
+  recetaDetalle = { ...recetaDetalle, nombre };
+  recetas = await get('/recetas');
+  document.getElementById('btn-save-nombre').style.display = 'none';
+  toast('✓ Nombre actualizado');
+}
+
+async function duplicarReceta(id, nombre) {
+  const nuevonombre = `${nombre} (copia)`;
+  const original = recetaDetalle;
+  // Crear nueva receta con los mismos parámetros
+  const nueva = await post('/recetas', {
+    nombre: nuevonombre,
+    gastos_extra: original.gastos_extra,
+    margen: original.margen,
+    notas: original.notas || ''
+  });
+  if (nueva.detail) { toast(nueva.detail, '#e8a598'); return; }
+  // Copiar ingredientes uno por uno
+  for (const ing of (original.ingredientes || [])) {
+    await post(`/recetas/${nueva.id}/ingredientes`, {
+      ingrediente_id: ing.id,
+      cantidad: ing.cantidad
+    });
+  }
+  recetas = await get('/recetas');
+  recetaDetalle = await get(`/recetas/${nueva.id}`);
+  render();
+  toast(`✓ Receta duplicada como "${nuevonombre}"`);
 }
 
 async function volverRecetas() {
