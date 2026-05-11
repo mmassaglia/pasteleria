@@ -1174,18 +1174,24 @@ function toggleEditIng(riId) {
 async function guardarEdicionIng(recetaId, riId) {
   const ing_id = parseInt(document.getElementById(`edit-ing-sel-${riId}`).value);
   const cantidad = parseFloat(document.getElementById(`edit-ing-cant-${riId}`).value);
-  const precioInput = document.getElementById(`edit-ing-precio-${riId}`).value;
+  const precioInput = document.getElementById(`edit-ing-precio-${riId}`).value.trim();
 
   if (isNaN(cantidad) || cantidad <= 0) { toast('Cantidad inválida', '#e8a598'); return; }
 
   try {
-    // Actualizar precio base del ingrediente si se completó
+    // Actualizar precio base solo si se completó Y tenemos el ingrediente completo
     if (precioInput !== '') {
       const precio = parseFloat(precioInput);
-      if (!isNaN(precio) && precio >= 0) {
-        await put(`/ingredientes/${ing_id}`, { precio });
-        const idx = ingredientes.findIndex(i => i.id === ing_id);
-        if (idx >= 0) ingredientes[idx].precio = precio;
+      if (!isNaN(precio) && precio > 0) {
+        const ingBase = ingredientes.find(i => i.id === ing_id);
+        if (ingBase) {
+          await put(`/ingredientes/${ing_id}`, {
+            nombre: ingBase.nombre,
+            unidad: ingBase.unidad,
+            precio
+          });
+          ingBase.precio = precio;
+        }
       }
     }
 
@@ -1193,13 +1199,20 @@ async function guardarEdicionIng(recetaId, riId) {
     await del(`/recetas/${recetaId}/ingredientes/${riId}`);
     const data = await post(`/recetas/${recetaId}/ingredientes`, { ingrediente_id: ing_id, cantidad });
     if (data && data.detail) { toast(data.detail, '#e8a598'); return; }
-    recetaDetalle = data;
+
+    // Si la respuesta no trae ingredientes, recargar desde API
+    let detalle = data;
+    if (!detalle || !detalle.ingredientes) {
+      detalle = await get(`/recetas/${recetaId}`);
+    }
+    recetaDetalle = detalle;
     recetas = await get('/recetas');
     const ingDiv = document.getElementById('ing-detalle');
-    if (ingDiv) ingDiv.innerHTML = renderIngDetalle(recetaDetalle.ingredientes);
+    if (ingDiv) ingDiv.innerHTML = renderIngDetalle(recetaDetalle.ingredientes || []);
     actualizarResumenDetalle(recetaDetalle);
     toast('✓ Ingrediente actualizado');
   } catch(e) {
+    console.error('guardarEdicionIng error:', e);
     toast('Error al actualizar ingrediente', '#e8a598');
   }
 }
