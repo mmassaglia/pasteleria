@@ -719,6 +719,9 @@ let ingredientes = [];
 let recetas = [];
 let tabActual = 'resumen';
 let recetaDetalle = null;
+let clientes = [];
+let presupuestos = [];
+let presupuestoDetalle = null;
 let usuarioActual = null;
 let tokenActual = null;
 
@@ -763,8 +766,22 @@ async function mostrarApp() {
   document.getElementById('app-screen').style.display = 'block';
   document.getElementById('usuario-badge').textContent = usuarioActual.nombre + (usuarioActual.rol === 'admin' ? ' (admin)' : '');
 
-  // Mostrar tab de usuarios solo para admin
+  // Agregar tabs extra según rol
   const nav = document.getElementById('nav-bar');
+  if (!document.getElementById('btn-tab-clientes')) {
+    const bc = document.createElement('button');
+    bc.id = 'btn-tab-clientes';
+    bc.textContent = '👥 Clientes';
+    bc.onclick = () => showTab('clientes');
+    nav.appendChild(bc);
+  }
+  if (!document.getElementById('btn-tab-presupuestos')) {
+    const bp = document.createElement('button');
+    bp.id = 'btn-tab-presupuestos';
+    bp.textContent = '📄 Presupuestos';
+    bp.onclick = () => showTab('presupuestos');
+    nav.appendChild(bp);
+  }
   if (usuarioActual.rol === 'admin') {
     if (!document.getElementById('btn-tab-usuarios')) {
       const btn = document.createElement('button');
@@ -835,14 +852,14 @@ async function del(url) {
 }
 
 async function cargarDatos() {
-  [ingredientes, recetas] = await Promise.all([get('/ingredientes'), get('/recetas')]);
+  [ingredientes, recetas, clientes, presupuestos] = await Promise.all([get('/ingredientes'), get('/recetas'), get('/clientes'), get('/presupuestos')]);
 }
 
 function showTab(tab) {
   tabActual = tab;
   recetaDetalle = null;
   document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
-  const tabs = ['resumen','ingredientes','recetas','usuarios'];
+  const tabs = ['resumen','ingredientes','recetas','clientes','presupuestos','usuarios'];
   document.querySelectorAll('nav button').forEach((b,i) => {
     if (tabs[i] === tab) b.classList.add('active');
   });
@@ -858,6 +875,11 @@ async function render() {
     else renderRecetas(app);
   }
   else if (tabActual === 'usuarios') renderUsuarios(app);
+  else if (tabActual === 'clientes') renderClientes(app);
+  else if (tabActual === 'presupuestos') {
+    if (presupuestoDetalle) renderPresupuestoDetalle(app);
+    else renderPresupuestos(app);
+  }
 }
 
 // ── RESUMEN ──
@@ -1399,6 +1421,404 @@ async function eliminarUsuario(id, nombre) {
   if (r.detail) { toast(r.detail, '#e8a598'); return; }
   toast('Usuario eliminado', '#c97b6e');
   renderUsuarios(document.getElementById('app'));
+}
+
+// ══════════════════════════════════════════
+// CLIENTES
+// ══════════════════════════════════════════
+
+function renderClientes(app) {
+  app.innerHTML = `
+    <div class="sec-title">👥 Clientes</div>
+    <div class="nueva-receta-form">
+      <div><label>Nombre *</label><input type="text" id="cl-nombre" placeholder="Nombre del cliente"/></div>
+      <div><label>Teléfono</label><input type="text" id="cl-tel" placeholder="Ej: 351-1234567"/></div>
+      <div><label>Email</label><input type="text" id="cl-email" placeholder="cliente@mail.com"/></div>
+      <button class="btn-primary" onclick="crearCliente()">+ Agregar cliente</button>
+    </div>
+    <div class="ing-list" id="cl-list">
+      ${renderClienteList(clientes)}
+    </div>
+  `;
+}
+
+function renderClienteList(lista) {
+  if (!lista.length) return '<div class="loading">Sin clientes aún</div>';
+  return lista.map(cl => `
+    <div class="ing-item" id="cl-item-${cl.id}">
+      <div style="flex:1">
+        <div style="font-weight:600">${cl.nombre}</div>
+        <div style="font-size:0.82rem;color:var(--gris)">${[cl.telefono, cl.email].filter(Boolean).join(' · ') || 'Sin contacto'}</div>
+      </div>
+      <button onclick="abrirEditCliente(${cl.id})" style="background:none;border:none;cursor:pointer;color:var(--marron-claro);font-size:1rem;padding:5px 8px;">✏️</button>
+      <button onclick="eliminarCliente(${cl.id}, '${cl.nombre.replace(/'/g,"\\'")}' )" style="background:none;border:none;cursor:pointer;color:var(--rosa);font-size:1rem;padding:5px 8px;">🗑️</button>
+    </div>
+  `).join('');
+}
+
+async function crearCliente() {
+  const nombre = document.getElementById('cl-nombre').value.trim();
+  if (!nombre) { toast('El nombre es obligatorio', '#e8a598'); return; }
+  const tel = document.getElementById('cl-tel').value.trim();
+  const email = document.getElementById('cl-email').value.trim();
+  const r = await post('/clientes', { nombre, telefono: tel||null, email: email||null });
+  if (r.detail) { toast(r.detail, '#e8a598'); return; }
+  clientes = await get('/clientes');
+  document.getElementById('cl-nombre').value = '';
+  document.getElementById('cl-tel').value = '';
+  document.getElementById('cl-email').value = '';
+  document.getElementById('cl-list').innerHTML = renderClienteList(clientes);
+  toast('✓ Cliente agregado');
+}
+
+function abrirEditCliente(id) {
+  const cl = clientes.find(c => c.id === id);
+  if (!cl) return;
+  const item = document.getElementById(`cl-item-${id}`);
+  item.innerHTML = `
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;width:100%">
+      <input type="text" id="edit-cl-nombre-${id}" value="${cl.nombre}" style="flex:1;min-width:120px;border:1.5px solid #e8d8cc;border-radius:8px;padding:6px 10px;font-family:'DM Sans',sans-serif;"/>
+      <input type="text" id="edit-cl-tel-${id}" value="${cl.telefono||''}" placeholder="Teléfono" style="width:130px;border:1.5px solid #e8d8cc;border-radius:8px;padding:6px 10px;font-family:'DM Sans',sans-serif;"/>
+      <input type="text" id="edit-cl-email-${id}" value="${cl.email||''}" placeholder="Email" style="width:160px;border:1.5px solid #e8d8cc;border-radius:8px;padding:6px 10px;font-family:'DM Sans',sans-serif;"/>
+      <button onclick="guardarCliente(${id})" class="btn-primary" style="padding:7px 14px;">✓</button>
+      <button onclick="renderClientes(document.getElementById('app'))" style="background:none;border:1px solid #e8d8cc;border-radius:8px;padding:7px 10px;cursor:pointer;font-family:'DM Sans',sans-serif;">✕</button>
+    </div>
+  `;
+}
+
+async function guardarCliente(id) {
+  const nombre = document.getElementById(`edit-cl-nombre-${id}`).value.trim();
+  const tel = document.getElementById(`edit-cl-tel-${id}`).value.trim();
+  const email = document.getElementById(`edit-cl-email-${id}`).value.trim();
+  if (!nombre) { toast('El nombre es obligatorio', '#e8a598'); return; }
+  await put(`/clientes/${id}`, { nombre, telefono: tel||null, email: email||null });
+  clientes = await get('/clientes');
+  document.getElementById('cl-list').innerHTML = renderClienteList(clientes);
+  toast('✓ Cliente actualizado');
+}
+
+async function eliminarCliente(id, nombre) {
+  if (!confirm(`¿Eliminar cliente "${nombre}"?`)) return;
+  await del(`/clientes/${id}`);
+  clientes = await get('/clientes');
+  document.getElementById('cl-list').innerHTML = renderClienteList(clientes);
+  toast('Cliente eliminado', '#c97b6e');
+}
+
+// ══════════════════════════════════════════
+// PRESUPUESTOS
+// ══════════════════════════════════════════
+
+const ESTADOS = { borrador: '📝 Borrador', enviado: '📤 Enviado', aceptado: '✅ Aceptado', rechazado: '❌ Rechazado' };
+const ESTADO_COLOR = { borrador: '#fff8e6', enviado: '#e8f0fb', aceptado: '#edf7ee', rechazado: '#fce8e4' };
+const ESTADO_TEXT = { borrador: '#7a6020', enviado: '#2a5090', aceptado: '#3a6e40', rechazado: '#c97b6e' };
+
+function renderPresupuestos(app) {
+  app.innerHTML = `
+    <div class="sec-title">📄 Presupuestos</div>
+    <div class="nueva-receta-form">
+      <div><label>Título *</label><input type="text" id="pres-titulo" placeholder="Ej: Torta cumpleaños 15"/></div>
+      <div>
+        <label>Cliente</label>
+        <select id="pres-cliente" style="border:1.5px solid #e8d8cc;border-radius:10px;padding:10px 14px;font-family:'DM Sans',sans-serif;background:var(--crema);width:100%;">
+          <option value="">Sin cliente</option>
+          ${clientes.map(cl => `<option value="${cl.id}">${cl.nombre}</option>`).join('')}
+        </select>
+      </div>
+      <button class="btn-primary" onclick="crearPresupuesto()">+ Nuevo presupuesto</button>
+    </div>
+    <div class="recetas-grid" id="pres-grid">
+      ${renderPresupuestosGrid(presupuestos)}
+    </div>
+  `;
+}
+
+function renderPresupuestosGrid(lista) {
+  if (!lista.length) return '<div class="loading">Sin presupuestos aún</div>';
+  return lista.map(p => `
+    <div class="receta-card" onclick="abrirPresupuesto(${p.id})" style="cursor:pointer">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+        <h3 style="margin:0">${p.titulo}</h3>
+        <span style="font-size:0.75rem;font-weight:600;padding:3px 10px;border-radius:20px;background:${ESTADO_COLOR[p.estado]||'#f5f5f5'};color:${ESTADO_TEXT[p.estado]||'#666'}">${ESTADOS[p.estado]||p.estado}</span>
+      </div>
+      ${p.cliente_nombre ? `<div style="font-size:0.83rem;color:var(--gris);margin-bottom:6px">👥 ${p.cliente_nombre}</div>` : ''}
+      <div class="precio-final-badge"><span class="lbl">Total</span><span class="val">${fmt(p.total)}</span></div>
+      <div style="font-size:0.75rem;color:var(--gris);margin-top:8px">${new Date(p.created_at).toLocaleDateString('es-AR')}</div>
+    </div>
+  `).join('');
+}
+
+async function crearPresupuesto() {
+  const titulo = document.getElementById('pres-titulo').value.trim();
+  if (!titulo) { toast('El título es obligatorio', '#e8a598'); return; }
+  const cliente_id = document.getElementById('pres-cliente').value || null;
+  const r = await post('/presupuestos', { titulo, cliente_id: cliente_id ? parseInt(cliente_id) : null });
+  if (r.detail) { toast(r.detail, '#e8a598'); return; }
+  presupuestoDetalle = r;
+  presupuestos = await get('/presupuestos');
+  render();
+}
+
+async function abrirPresupuesto(id) {
+  presupuestoDetalle = await get(`/presupuestos/${id}`);
+  render();
+}
+
+async function renderPresupuestoDetalle(app) {
+  const p = presupuestoDetalle;
+  app.innerHTML = `
+    <div class="detalle-header">
+      <button class="btn-back" onclick="volverPresupuestos()">← Volver</button>
+      <div class="edit-nombre-wrap">
+        <input class="input-nombre-receta" id="pres-titulo-input" type="text" value="${p.titulo}"
+          oninput="document.getElementById('btn-save-pres-titulo').style.display='inline-block'"
+          onkeydown="if(event.key==='Enter') guardarTituloPresupuesto(${p.id})"/>
+        <button class="btn-save-nombre" id="btn-save-pres-titulo" onclick="guardarTituloPresupuesto(${p.id})">✓ Guardar</button>
+      </div>
+      <div style="display:flex;gap:8px;margin-left:auto;align-items:center">
+        <select id="pres-estado-sel" onchange="cambiarEstadoPresupuesto(${p.id})"
+          style="border:1.5px solid #e8d8cc;border-radius:8px;padding:6px 10px;font-family:'DM Sans',sans-serif;background:${ESTADO_COLOR[p.estado]};color:${ESTADO_TEXT[p.estado]};font-weight:600;font-size:0.85rem;">
+          ${Object.entries(ESTADOS).map(([k,v]) => `<option value="${k}" ${k===p.estado?'selected':''}>${v}</option>`).join('')}
+        </select>
+        <button onclick="imprimirPresupuesto()" style="background:var(--crema);border:1.5px solid #e8d8cc;border-radius:8px;padding:7px 14px;cursor:pointer;font-size:0.85rem;font-weight:600;font-family:'DM Sans',sans-serif;">🖨️ Imprimir</button>
+        <button onclick="eliminarPresupuesto(${p.id})" style="background:#fce8e4;border:none;border-radius:8px;padding:7px 14px;cursor:pointer;color:var(--rosa-oscuro);font-weight:600;font-size:0.85rem;font-family:'DM Sans',sans-serif;">🗑️ Eliminar</button>
+      </div>
+    </div>
+
+    <!-- Cliente -->
+    <div style="background:var(--blanco);border-radius:14px;box-shadow:var(--sombra);padding:16px 20px;margin-bottom:16px;display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+      <div style="flex:1">
+        <div style="font-size:0.75rem;color:var(--gris);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Cliente</div>
+        <select id="pres-cliente-sel" onchange="cambiarClientePresupuesto(${p.id})"
+          style="border:1.5px solid #e8d8cc;border-radius:8px;padding:6px 10px;font-family:'DM Sans',sans-serif;font-size:0.9rem;background:var(--crema);min-width:200px">
+          <option value="">Sin cliente</option>
+          ${clientes.map(cl => `<option value="${cl.id}" ${cl.id===p.cliente_id?'selected':''}>${cl.nombre}</option>`).join('')}
+        </select>
+      </div>
+      ${p.cliente_nombre ? `
+        <div style="font-size:0.85rem;color:var(--gris);line-height:1.6">
+          ${p.cliente_telefono ? `📞 ${p.cliente_telefono}<br>` : ''}
+          ${p.cliente_email ? `✉️ ${p.cliente_email}` : ''}
+        </div>` : ''}
+    </div>
+
+    <!-- Items -->
+    <div style="background:var(--blanco);border-radius:14px;box-shadow:var(--sombra);padding:20px;margin-bottom:16px">
+      <div style="font-family:'Playfair Display',serif;font-size:1.1rem;color:var(--marron);margin-bottom:14px">Productos / Servicios</div>
+      <div id="pres-items">
+        ${renderPresupuestoItems(p.items)}
+      </div>
+
+      <!-- Agregar item -->
+      <div style="border-top:1px solid #f0e4d8;margin-top:14px;padding-top:14px">
+        <div style="font-size:0.75rem;color:var(--gris);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Agregar producto</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+          <div style="flex:2;min-width:160px">
+            <label style="font-size:0.72rem;color:var(--gris);display:block;margin-bottom:3px">Descripción</label>
+            <input type="text" id="add-item-desc" placeholder="Ej: Torta de chocolate" list="recetas-list"
+              style="width:100%;border:1.5px solid #e8d8cc;border-radius:8px;padding:7px 10px;font-family:'DM Sans',sans-serif;font-size:0.88rem;background:var(--crema)"/>
+            <datalist id="recetas-list">
+              ${recetas.map(r => `<option value="${r.nombre}" data-id="${r.id}" data-precio="${r.precio_final}">`).join('')}
+            </datalist>
+          </div>
+          <div>
+            <label style="font-size:0.72rem;color:var(--gris);display:block;margin-bottom:3px">Cantidad</label>
+            <input type="number" id="add-item-cant" value="1" min="1" style="width:70px;border:1.5px solid #e8d8cc;border-radius:8px;padding:7px 10px;font-family:'DM Sans',sans-serif;font-size:0.88rem;background:var(--crema)"/>
+          </div>
+          <div>
+            <label style="font-size:0.72rem;color:var(--gris);display:block;margin-bottom:3px">Precio unit. ($)</label>
+            <input type="number" id="add-item-precio" placeholder="0" style="width:120px;border:1.5px solid #e8d8cc;border-radius:8px;padding:7px 10px;font-family:'DM Sans',sans-serif;font-size:0.88rem;background:var(--crema)"/>
+          </div>
+          <button class="btn-primary" onclick="agregarItem(${p.id})" style="padding:8px 18px">+ Agregar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Total + notas -->
+    <div style="display:grid;grid-template-columns:1fr auto;gap:16px;align-items:start;flex-wrap:wrap">
+      <div style="background:var(--blanco);border-radius:14px;box-shadow:var(--sombra);padding:16px 20px">
+        <div style="font-size:0.75rem;color:var(--gris);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">📝 Notas para el cliente</div>
+        <textarea id="pres-notas" placeholder="Incluye entrega a domicilio, decoración personalizada..."
+          style="width:100%;border:1.5px solid #e8d8cc;border-radius:10px;padding:10px 14px;font-family:'DM Sans',sans-serif;font-size:0.88rem;background:var(--crema);resize:vertical;min-height:80px"
+          onchange="guardarNotasPresupuesto(${p.id})">${p.notas || ''}</textarea>
+      </div>
+      <div style="background:var(--marron);color:var(--crema);border-radius:14px;padding:20px 28px;text-align:center;min-width:160px">
+        <div style="font-size:0.75rem;opacity:0.7;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Total</div>
+        <div id="pres-total" style="font-family:'Playfair Display',serif;font-size:2rem;color:var(--amarillo)">${fmt(p.total)}</div>
+      </div>
+    </div>
+  `;
+
+  // Auto-completar precio al seleccionar receta
+  document.getElementById('add-item-desc').addEventListener('input', function() {
+    const match = recetas.find(r => r.nombre === this.value);
+    if (match) document.getElementById('add-item-precio').value = Math.round(match.precio_final);
+  });
+}
+
+function renderPresupuestoItems(items) {
+  if (!items.length) return '<div style="color:var(--gris);font-style:italic;padding:8px">Sin productos aún</div>';
+  return items.map(item => `
+    <div class="ing-detalle-row" id="pres-item-${item.id}">
+      <div class="ing-row-vista">
+        <span class="nombre">${item.descripcion}</span>
+        <span class="cant" style="min-width:50px">x${item.cantidad}</span>
+        <span class="costo">${fmt(item.precio_unit)} c/u</span>
+        <span class="costo" style="font-size:1rem">${fmt(item.precio_total)}</span>
+        <button class="btn-editar-ing" onclick="toggleEditItem(${item.id})" title="Editar">✏️</button>
+        <button class="btn-del" onclick="eliminarItem(${presupuestoDetalle.id}, ${item.id})">✕</button>
+      </div>
+      <div class="ing-row-edit">
+        <div>
+          <label>Descripción</label>
+          <input type="text" id="edit-item-desc-${item.id}" value="${item.descripcion}" style="width:200px;border:1.5px solid #e8d8cc;border-radius:8px;padding:6px 10px;font-family:'DM Sans',sans-serif;"/>
+        </div>
+        <div>
+          <label>Cantidad</label>
+          <input type="number" id="edit-item-cant-${item.id}" value="${item.cantidad}" min="1" style="width:70px;border:1.5px solid #e8d8cc;border-radius:8px;padding:6px 10px;font-family:'DM Sans',sans-serif;"/>
+        </div>
+        <div>
+          <label>Precio unit. ($)</label>
+          <input type="number" id="edit-item-precio-${item.id}" value="${item.precio_unit}" style="width:110px;border:1.5px solid #e8d8cc;border-radius:8px;padding:6px 10px;font-family:'DM Sans',sans-serif;"/>
+        </div>
+        <button class="btn-save-ing" onclick="guardarItem(${presupuestoDetalle.id}, ${item.id}, ${item.receta_id||'null'})">✓ Guardar</button>
+        <button class="btn-cancel-ing" onclick="toggleEditItem(${item.id})">Cancelar</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function toggleEditItem(itemId) {
+  document.getElementById(`pres-item-${itemId}`)?.classList.toggle('editando');
+}
+
+async function agregarItem(presupuestoId) {
+  const desc = document.getElementById('add-item-desc').value.trim();
+  const cant = parseInt(document.getElementById('add-item-cant').value) || 1;
+  const precio = parseFloat(document.getElementById('add-item-precio').value);
+  if (!desc) { toast('Completá la descripción', '#e8a598'); return; }
+  if (isNaN(precio) || precio <= 0) { toast('Ingresá un precio válido', '#e8a598'); return; }
+  const receta = recetas.find(r => r.nombre === desc);
+  const data = await post(`/presupuestos/${presupuestoId}/items`, {
+    descripcion: desc, cantidad: cant, precio_unit: precio,
+    receta_id: receta ? receta.id : null
+  });
+  presupuestoDetalle = data;
+  presupuestos = await get('/presupuestos');
+  renderPresupuestoDetalle(document.getElementById('app'));
+  toast('✓ Producto agregado');
+}
+
+async function guardarItem(presupuestoId, itemId, recetaId) {
+  const desc = document.getElementById(`edit-item-desc-${itemId}`).value.trim();
+  const cant = parseInt(document.getElementById(`edit-item-cant-${itemId}`).value) || 1;
+  const precio = parseFloat(document.getElementById(`edit-item-precio-${itemId}`).value);
+  if (!desc || isNaN(precio) || precio <= 0) { toast('Datos inválidos', '#e8a598'); return; }
+  const data = await put(`/presupuestos/${presupuestoId}/items/${itemId}`, {
+    descripcion: desc, cantidad: cant, precio_unit: precio, receta_id: recetaId
+  });
+  presupuestoDetalle = data;
+  presupuestos = await get('/presupuestos');
+  renderPresupuestoDetalle(document.getElementById('app'));
+  toast('✓ Producto actualizado');
+}
+
+async function eliminarItem(presupuestoId, itemId) {
+  const data = await del(`/presupuestos/${presupuestoId}/items/${itemId}`);
+  presupuestoDetalle = data;
+  presupuestos = await get('/presupuestos');
+  document.getElementById('pres-items').innerHTML = renderPresupuestoItems(presupuestoDetalle.items);
+  document.getElementById('pres-total').textContent = fmt(presupuestoDetalle.total);
+  toast('Producto quitado', '#c97b6e');
+}
+
+async function guardarTituloPresupuesto(id) {
+  const titulo = document.getElementById('pres-titulo-input').value.trim();
+  if (!titulo) return;
+  await put(`/presupuestos/${id}`, { titulo });
+  presupuestoDetalle.titulo = titulo;
+  presupuestos = await get('/presupuestos');
+  document.getElementById('btn-save-pres-titulo').style.display = 'none';
+  toast('✓ Título guardado');
+}
+
+async function cambiarEstadoPresupuesto(id) {
+  const estado = document.getElementById('pres-estado-sel').value;
+  await put(`/presupuestos/${id}`, { estado });
+  presupuestoDetalle.estado = estado;
+  presupuestos = await get('/presupuestos');
+  const sel = document.getElementById('pres-estado-sel');
+  sel.style.background = ESTADO_COLOR[estado];
+  sel.style.color = ESTADO_TEXT[estado];
+  toast('✓ Estado actualizado');
+}
+
+async function cambiarClientePresupuesto(id) {
+  const cliente_id = document.getElementById('pres-cliente-sel').value;
+  const data = await put(`/presupuestos/${id}`, { cliente_id: cliente_id ? parseInt(cliente_id) : null });
+  presupuestoDetalle = data;
+  presupuestos = await get('/presupuestos');
+  toast('✓ Cliente actualizado');
+}
+
+async function guardarNotasPresupuesto(id) {
+  const notas = document.getElementById('pres-notas').value;
+  await put(`/presupuestos/${id}`, { notas });
+  presupuestoDetalle.notas = notas;
+  toast('✓ Notas guardadas');
+}
+
+async function eliminarPresupuesto(id) {
+  if (!confirm('¿Eliminar este presupuesto?')) return;
+  await del(`/presupuestos/${id}`);
+  presupuestos = await get('/presupuestos');
+  volverPresupuestos();
+  toast('Presupuesto eliminado', '#c97b6e');
+}
+
+function volverPresupuestos() {
+  presupuestoDetalle = null;
+  tabActual = 'presupuestos';
+  render();
+}
+
+function imprimirPresupuesto() {
+  const p = presupuestoDetalle;
+  const itemsHTML = p.items.map(i =>
+    `<tr><td>${i.descripcion}</td><td style="text-align:center">${i.cantidad}</td><td style="text-align:right">${fmt(i.precio_unit)}</td><td style="text-align:right"><strong>${fmt(i.precio_total)}</strong></td></tr>`
+  ).join('');
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>Presupuesto - ${p.titulo}</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 700px; margin: 40px auto; color: #3a2a22; }
+    h1 { color: #5c3d2e; border-bottom: 2px solid #e8a598; padding-bottom: 8px; }
+    .meta { color: #9e8a80; font-size: 0.9rem; margin-bottom: 24px; }
+    table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+    th { background: #5c3d2e; color: #fdf6ee; padding: 10px 12px; text-align: left; }
+    td { padding: 10px 12px; border-bottom: 1px solid #f0e4d8; }
+    tr:hover td { background: #fdf6ee; }
+    .total-row { font-size: 1.2rem; font-weight: bold; background: #fdf6ee; }
+    .notas { background: #fff8e6; border-left: 4px solid #f4c96e; padding: 12px 16px; border-radius: 4px; margin-top: 20px; font-size: 0.9rem; }
+    .footer { text-align: center; color: #9e8a80; font-size: 0.8rem; margin-top: 40px; }
+  </style></head><body>
+  <h1>🧁 Roxi Pastelería</h1>
+  <h2 style="margin-bottom:4px">${p.titulo}</h2>
+  <div class="meta">
+    ${p.cliente_nombre ? `👥 <strong>${p.cliente_nombre}</strong>${p.cliente_telefono ? ' · 📞 '+p.cliente_telefono : ''}${p.cliente_email ? ' · ✉️ '+p.cliente_email : ''}<br>` : ''}
+    📅 ${new Date(p.created_at).toLocaleDateString('es-AR', {year:'numeric',month:'long',day:'numeric'})}
+    &nbsp;·&nbsp; Estado: <strong>${ESTADOS[p.estado]||p.estado}</strong>
+  </div>
+  <table>
+    <thead><tr><th>Producto / Servicio</th><th style="text-align:center">Cant.</th><th style="text-align:right">Precio unit.</th><th style="text-align:right">Total</th></tr></thead>
+    <tbody>${itemsHTML}</tbody>
+    <tfoot><tr class="total-row"><td colspan="3" style="text-align:right;padding-right:12px">TOTAL</td><td style="text-align:right">${fmt(p.total)}</td></tr></tfoot>
+  </table>
+  ${p.notas ? `<div class="notas"><strong>📝 Notas:</strong><br>${p.notas}</div>` : ''}
+  <div class="footer">Roxi Pastelería · Sistema de Costeo</div>
+  </body></html>`);
+  win.document.close();
+  win.print();
 }
 </script>
 </body>
