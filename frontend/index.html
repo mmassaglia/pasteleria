@@ -1613,13 +1613,18 @@ async function renderPresupuestoDetalle(app) {
       <div style="border-top:1px solid #f0e4d8;margin-top:14px;padding-top:14px">
         <div style="font-size:0.75rem;color:var(--gris);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Agregar producto</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+          <div style="flex:2;min-width:200px">
+            <label style="font-size:0.72rem;color:var(--gris);display:block;margin-bottom:3px">Receta (opcional)</label>
+            <select id="add-item-receta" onchange="seleccionarRecetaPresupuesto()"
+              style="width:100%;border:1.5px solid #e8d8cc;border-radius:8px;padding:7px 10px;font-family:'DM Sans',sans-serif;font-size:0.88rem;background:var(--crema);color:var(--texto)">
+              <option value="">-- Seleccionar receta --</option>
+              ${recetas.map(r => `<option value="${r.id}" data-precio="${Math.round(r.precio_final)}" data-nombre="${r.nombre.replace(/"/g,'&quot;')}">${r.nombre} — ${fmt(r.precio_final)}</option>`).join('')}
+            </select>
+          </div>
           <div style="flex:2;min-width:160px">
-            <label style="font-size:0.72rem;color:var(--gris);display:block;margin-bottom:3px">Descripción</label>
-            <input type="text" id="add-item-desc" placeholder="Ej: Torta de chocolate" list="recetas-list"
+            <label style="font-size:0.72rem;color:var(--gris);display:block;margin-bottom:3px">Descripción *</label>
+            <input type="text" id="add-item-desc" placeholder="Ej: Torta de chocolate"
               style="width:100%;border:1.5px solid #e8d8cc;border-radius:8px;padding:7px 10px;font-family:'DM Sans',sans-serif;font-size:0.88rem;background:var(--crema)"/>
-            <datalist id="recetas-list">
-              ${recetas.map(r => `<option value="${r.nombre}" data-id="${r.id}" data-precio="${r.precio_final}">`).join('')}
-            </datalist>
           </div>
           <div>
             <label style="font-size:0.72rem;color:var(--gris);display:block;margin-bottom:3px">Cantidad</label>
@@ -1649,11 +1654,34 @@ async function renderPresupuestoDetalle(app) {
     </div>
   `;
 
-  // Auto-completar precio al seleccionar receta
-  document.getElementById('add-item-desc').addEventListener('input', function() {
-    const match = recetas.find(r => r.nombre === this.value);
-    if (match) document.getElementById('add-item-precio').value = Math.round(match.precio_final);
+}
+
+function seleccionarRecetaPresupuesto() {
+  const sel = document.getElementById('add-item-receta');
+  const opt = sel.options[sel.selectedIndex];
+  if (!opt || !opt.value) return;
+  // Rellenar descripción y precio automáticamente
+  const nombre = opt.getAttribute('data-nombre') || opt.text.split(' —')[0];
+  const precio = opt.getAttribute('data-precio') || '';
+  document.getElementById('add-item-desc').value = nombre;
+  document.getElementById('add-item-precio').value = precio;
+}
+
+async function agregarItem(presupuestoId) {
+  const desc = document.getElementById('add-item-desc').value.trim();
+  const cant = parseInt(document.getElementById('add-item-cant').value) || 1;
+  const precio = parseFloat(document.getElementById('add-item-precio').value);
+  if (!desc) { toast('Completá la descripción', '#e8a598'); return; }
+  if (isNaN(precio) || precio <= 0) { toast('Ingresá un precio válido', '#e8a598'); return; }
+  const recetaSel = document.getElementById('add-item-receta');
+  const receta_id = recetaSel && recetaSel.value ? parseInt(recetaSel.value) : null;
+  const data = await post(`/presupuestos/${presupuestoId}/items`, {
+    descripcion: desc, cantidad: cant, precio_unit: precio, receta_id
   });
+  presupuestoDetalle = data;
+  presupuestos = await get('/presupuestos');
+  renderPresupuestoDetalle(document.getElementById('app'));
+  toast('✓ Producto agregado');
 }
 
 function renderPresupuestoItems(items) {
@@ -1690,23 +1718,6 @@ function renderPresupuestoItems(items) {
 
 function toggleEditItem(itemId) {
   document.getElementById(`pres-item-${itemId}`)?.classList.toggle('editando');
-}
-
-async function agregarItem(presupuestoId) {
-  const desc = document.getElementById('add-item-desc').value.trim();
-  const cant = parseInt(document.getElementById('add-item-cant').value) || 1;
-  const precio = parseFloat(document.getElementById('add-item-precio').value);
-  if (!desc) { toast('Completá la descripción', '#e8a598'); return; }
-  if (isNaN(precio) || precio <= 0) { toast('Ingresá un precio válido', '#e8a598'); return; }
-  const receta = recetas.find(r => r.nombre === desc);
-  const data = await post(`/presupuestos/${presupuestoId}/items`, {
-    descripcion: desc, cantidad: cant, precio_unit: precio,
-    receta_id: receta ? receta.id : null
-  });
-  presupuestoDetalle = data;
-  presupuestos = await get('/presupuestos');
-  renderPresupuestoDetalle(document.getElementById('app'));
-  toast('✓ Producto agregado');
 }
 
 async function guardarItem(presupuestoId, itemId, recetaId) {
