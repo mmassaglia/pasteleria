@@ -523,7 +523,7 @@ def obtener_receta(receta_id: int, authorization: str = Header(None)):
         FROM receta_ingredientes ri
         JOIN ingredientes i ON ri.ingrediente_id = i.id
         WHERE ri.receta_id = %s
-        ORDER BY i.nombre
+        ORDER BY ri.orden, ri.id
     """, (receta_id,))
     ingredientes = c.fetchall()
     c.close()
