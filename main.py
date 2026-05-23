@@ -550,14 +550,14 @@ def crear_receta(data: RecetaCreate, authorization: str = Header(None)):
         )
         receta_id = c.fetchone()["id"]
         conn.commit()
-        c.close()
-        conn.close()
-        return obtener_receta(receta_id)
     except Exception:
         conn.rollback()
         c.close()
         conn.close()
         raise HTTPException(400, f"Ya existe una receta con el nombre '{data.nombre}'")
+    c.close()
+    conn.close()
+    return obtener_receta(receta_id)
 
 @app.put("/recetas/{receta_id}", tags=["Recetas"], summary="Actualizar receta")
 def actualizar_receta(receta_id: int, data: RecetaUpdate, authorization: str = Header(None)):
