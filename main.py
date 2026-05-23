@@ -505,9 +505,8 @@ def listar_recetas(authorization: str = Header(None)):
     conn.close()
     return resultado
 
-@app.get("/recetas/{receta_id}", tags=["Recetas"], summary="Detalle de receta con ingredientes")
-def obtener_receta(receta_id: int, authorization: str = Header(None)):
-    verificar_token(authorization)
+def _get_receta(receta_id: int):
+    """Función interna — obtiene receta sin verificar token."""
     conn = get_db()
     c = conn.cursor()
     c.execute("SELECT * FROM recetas WHERE id=%s", (receta_id,))
@@ -538,6 +537,11 @@ def obtener_receta(receta_id: int, authorization: str = Header(None)):
         "ingredientes": [dict(i) for i in ingredientes],
     }
 
+@app.get("/recetas/{receta_id}", tags=["Recetas"], summary="Detalle de receta con ingredientes")
+def obtener_receta(receta_id: int, authorization: str = Header(None)):
+    verificar_token(authorization)
+    return _get_receta(receta_id)
+
 @app.post("/recetas", tags=["Recetas"], summary="Crear nueva receta")
 def crear_receta(data: RecetaCreate, authorization: str = Header(None)):
     verificar_token(authorization)
@@ -557,7 +561,7 @@ def crear_receta(data: RecetaCreate, authorization: str = Header(None)):
         raise HTTPException(400, f"Ya existe una receta con el nombre '{data.nombre}'")
     c.close()
     conn.close()
-    return obtener_receta(receta_id)
+    return _get_receta(receta_id)
 
 @app.put("/recetas/{receta_id}", tags=["Recetas"], summary="Actualizar receta")
 def actualizar_receta(receta_id: int, data: RecetaUpdate, authorization: str = Header(None)):
@@ -578,7 +582,7 @@ def actualizar_receta(receta_id: int, data: RecetaUpdate, authorization: str = H
         conn.commit()
     c.close()
     conn.close()
-    return obtener_receta(receta_id)
+    return _get_receta(receta_id)
 
 @app.delete("/recetas/{receta_id}", tags=["Recetas"])
 def eliminar_receta(receta_id: int, authorization: str = Header(None)):
@@ -604,7 +608,7 @@ def agregar_ingrediente_receta(receta_id: int, item: RecetaIngredienteItem, auth
     conn.commit()
     c.close()
     conn.close()
-    return obtener_receta(receta_id)
+    return _get_receta(receta_id)
 
 @app.put("/recetas/{receta_id}/ingredientes/{ri_id}", tags=["Recetas"], summary="Actualizar cantidad de ingrediente")
 def actualizar_ingrediente_receta(receta_id: int, ri_id: int, item: RecetaIngredienteItem, authorization: str = Header(None)):
@@ -618,7 +622,7 @@ def actualizar_ingrediente_receta(receta_id: int, ri_id: int, item: RecetaIngred
     conn.commit()
     c.close()
     conn.close()
-    return obtener_receta(receta_id)
+    return _get_receta(receta_id)
 
 @app.delete("/recetas/{receta_id}/ingredientes/{ri_id}", tags=["Recetas"], summary="Quitar ingrediente de receta")
 def quitar_ingrediente_receta(receta_id: int, ri_id: int, authorization: str = Header(None)):
@@ -629,7 +633,7 @@ def quitar_ingrediente_receta(receta_id: int, ri_id: int, authorization: str = H
     conn.commit()
     c.close()
     conn.close()
-    return obtener_receta(receta_id)
+    return _get_receta(receta_id)
 
 # ─────────────────────────────────────────
 # RESUMEN
