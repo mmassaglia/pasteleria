@@ -855,7 +855,7 @@ async function cargarDatos() {
   [ingredientes, recetas, clientes, presupuestos] = await Promise.all([get('/ingredientes'), get('/recetas'), get('/clientes'), get('/presupuestos')]);
 }
 
-function showTab(tab) {
+async function showTab(tab) {
   tabActual = tab;
   recetaDetalle = null;
   document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
@@ -863,6 +863,10 @@ function showTab(tab) {
   document.querySelectorAll('nav button').forEach((b,i) => {
     if (tabs[i] === tab) b.classList.add('active');
   });
+  // Recargar recetas desde la API al entrar a esa sección (precios siempre frescos)
+  if (tab === 'recetas') {
+    recetas = await get('/recetas');
+  }
   render();
 }
 
@@ -1018,11 +1022,14 @@ async function guardarPrecio(id) {
   const input = document.getElementById(`precio-${id}`);
   const precio = parseFloat(input.value);
   if (isNaN(precio) || precio < 0) { toast('Precio inválido', '#e8a598'); return; }
+  const btn = document.querySelector(`button[onclick="guardarPrecio(${id})"]`);
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
   await put(`/ingredientes/${id}`, { precio });
   const idx = ingredientes.findIndex(i => i.id === id);
   if (idx >= 0) ingredientes[idx].precio = precio;
   recetas = await get('/recetas');
-  toast('✓ Precio actualizado');
+  if (btn) { btn.disabled = false; btn.textContent = '✓'; }
+  toast('✓ Precio actualizado — recetas recalculadas');
 }
 
 async function eliminarIngrediente(id, nombre) {
