@@ -436,7 +436,7 @@ def actualizar_ingrediente(ing_id: int, data: IngredienteUpdate, authorization: 
         conn.close()
         return dict(row)
     sets = ", ".join(f"{k}=%s" for k in campos)
-    sets += ", updated_at=NOW()::text"
+    sets += ", updated_at=NOW()"
     vals = list(campos.values()) + [ing_id]
     c.execute(f"UPDATE ingredientes SET {sets} WHERE id=%s RETURNING *", vals)
     row = c.fetchone()
