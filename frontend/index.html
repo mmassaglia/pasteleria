@@ -344,6 +344,8 @@
   .btn-del { background: none; border: none; color: #e8a598; cursor: pointer; font-size: 1.1rem; padding: 2px 6px; border-radius: 6px; transition: background 0.15s; }
   .btn-del:hover { background: #fce8e4; color: var(--rosa-oscuro); }
 
+  .ing-row-vista .precio-unit { color: var(--gris); font-size: 0.78rem; min-width: 80px; text-align: right; }
+
   /* Panel de edición (expandible) */
   .ing-row-edit {
     display: none;
@@ -1139,6 +1141,7 @@ function renderIngDetalle(lista) {
       <div class="ing-row-vista">
         <span class="nombre">${i.nombre}</span>
         <span class="cant">${i.cantidad} ${i.unidad === 'UN' ? 'un.' : 'g/ml'}</span>
+        <span class="precio-unit" title="Precio por ${i.unidad === 'UN' ? 'unidad' : i.unidad === 'KG' ? 'kg' : 'lt'}">$${Math.round(i.precio).toLocaleString('es-AR')}/${i.unidad === 'UN' ? 'un' : i.unidad === 'KG' ? 'kg' : 'lt'}</span>
         <span class="costo">${fmt(i.costo_real)}</span>
         <button class="btn-editar-ing" onclick="toggleEditIng(${i.id})" title="Editar">✏️</button>
         <button class="btn-del" onclick="quitarIngrediente(${recetaDetalle.id}, ${i.id})" title="Quitar">✕</button>
@@ -1195,8 +1198,9 @@ async function guardarEdicionIng(recetaId, riId) {
       }
     }
 
-    // Actualizar en lugar de borrar+crear — preserva el orden original
-    const data = await put(`/recetas/${recetaId}/ingredientes/${riId}`, { ingrediente_id: ing_id, cantidad });
+    // Quitar el anterior y agregar el nuevo
+    await del(`/recetas/${recetaId}/ingredientes/${riId}`);
+    const data = await post(`/recetas/${recetaId}/ingredientes`, { ingrediente_id: ing_id, cantidad });
     if (data && data.detail) { toast(data.detail, '#e8a598'); return; }
 
     // Si la respuesta no trae ingredientes, recargar desde API
