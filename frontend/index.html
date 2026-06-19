@@ -655,6 +655,88 @@
   .usuario-row .u-nombre { flex: 1; font-weight: 500; }
   .usuario-row .u-rol { font-size: 0.78rem; color: var(--gris); background: var(--crema); padding: 2px 10px; border-radius: 20px; }
 
+  /* CLIENTES */
+  .cliente-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--blanco);
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(92,61,46,0.06);
+    margin-bottom: 8px;
+  }
+  .cliente-row .c-info { flex: 1; }
+  .cliente-row .c-nombre { font-weight: 500; font-size: 0.95rem; }
+  .cliente-row .c-meta { font-size: 0.78rem; color: var(--gris); margin-top: 2px; }
+
+  /* PRESUPUESTOS */
+  .presu-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 18px;
+    background: var(--blanco);
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(92,61,46,0.06);
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: box-shadow 0.2s;
+  }
+  .presu-row:hover { box-shadow: 0 6px 20px rgba(92,61,46,0.12); }
+  .presu-row .p-info { flex: 1; }
+  .presu-row .p-titulo { font-weight: 600; font-family: 'Playfair Display', serif; color: var(--marron); }
+  .presu-row .p-meta { font-size: 0.78rem; color: var(--gris); margin-top: 2px; }
+  .presu-row .p-total { font-family: 'Playfair Display', serif; font-weight: 700; font-size: 1.1rem; color: var(--marron); }
+  .estado-tag {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 3px 10px;
+    border-radius: 20px;
+  }
+  .estado-borrador { background: #f0e4d8; color: var(--gris); }
+  .estado-enviado { background: #fde9c8; color: #a8762e; }
+  .estado-aprobado { background: #dcecdd; color: #4d7a51; }
+  .estado-rechazado { background: #fce8e4; color: var(--rosa-oscuro); }
+
+  .item-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: var(--crema);
+    border-radius: 10px;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+  }
+  .item-row .i-desc { flex: 1; font-weight: 500; }
+  .item-row .i-cant { color: var(--gris); font-size: 0.82rem; min-width: 50px; }
+  .item-row .i-precio { color: var(--gris); font-size: 0.82rem; min-width: 80px; text-align: right; }
+  .item-row .i-total { font-weight: 600; color: var(--marron-claro); min-width: 80px; text-align: right; }
+
+  .estado-selector {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .estado-btn {
+    border: 1.5px solid #e8d8cc;
+    background: var(--blanco);
+    color: var(--gris);
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    transition: all 0.2s;
+  }
+  .estado-btn.active { background: var(--marron); color: var(--crema); border-color: var(--marron); }
+  .estado-btn:hover:not(.active) { border-color: var(--rosa); color: var(--marron); }
+
   @media (max-width: 600px) {
     header h1 { font-size: 1.1rem; }
     .recetas-grid { grid-template-columns: 1fr; }
@@ -706,6 +788,8 @@
     <button class="active" onclick="showTab('resumen')">📊 Resumen</button>
     <button onclick="showTab('ingredientes')">🥚 Ingredientes</button>
     <button onclick="showTab('recetas')">📋 Recetas</button>
+    <button onclick="showTab('clientes')">👥 Clientes</button>
+    <button onclick="showTab('presupuestos')">🧾 Presupuestos</button>
   </nav>
 
   <main id="app">
@@ -719,8 +803,12 @@
 const API = '';
 let ingredientes = [];
 let recetas = [];
+let clientes = [];
+let presupuestos = [];
 let tabActual = 'resumen';
 let recetaDetalle = null;
+let presupuestoDetalle = null;
+let clienteEditandoId = null;
 let usuarioActual = null;
 let tokenActual = null;
 
@@ -837,14 +925,17 @@ async function del(url) {
 }
 
 async function cargarDatos() {
-  [ingredientes, recetas] = await Promise.all([get('/ingredientes'), get('/recetas')]);
+  [ingredientes, recetas, clientes, presupuestos] = await Promise.all([
+    get('/ingredientes'), get('/recetas'), get('/clientes'), get('/presupuestos')
+  ]);
 }
 
 function showTab(tab) {
   tabActual = tab;
   recetaDetalle = null;
+  presupuestoDetalle = null;
   document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
-  const tabs = ['resumen','ingredientes','recetas','usuarios'];
+  const tabs = ['resumen','ingredientes','recetas','clientes','presupuestos','usuarios'];
   document.querySelectorAll('nav button').forEach((b,i) => {
     if (tabs[i] === tab) b.classList.add('active');
   });
@@ -858,6 +949,11 @@ async function render() {
   else if (tabActual === 'recetas') {
     if (recetaDetalle) renderDetalle(app);
     else renderRecetas(app);
+  }
+  else if (tabActual === 'clientes') renderClientes(app);
+  else if (tabActual === 'presupuestos') {
+    if (presupuestoDetalle) renderPresupuestoDetalle(app);
+    else renderPresupuestos(app);
   }
   else if (tabActual === 'usuarios') renderUsuarios(app);
 }
@@ -1350,6 +1446,322 @@ async function eliminarReceta(id, nombre) {
   tabActual = 'recetas';
   render();
   toast('Receta eliminada', '#c97b6e');
+}
+
+// ── CLIENTES ──
+function renderClientes(app) {
+  app.innerHTML = `
+    <div class="sec-title">Clientes</div>
+    <div class="nueva-receta-form" id="form-cliente">
+      <div><label>Nombre</label><input type="text" id="cli-nombre" placeholder="Ej: María García"/></div>
+      <div><label>Teléfono</label><input type="text" id="cli-telefono" placeholder="Ej: 351 555 1234"/></div>
+      <div><label>Email</label><input type="text" id="cli-email" placeholder="Ej: maria@mail.com"/></div>
+      <div><label>Notas</label><input type="text" id="cli-notas" placeholder="Ej: Cliente frecuente"/></div>
+      <button class="btn-primary" onclick="guardarCliente()">+ Agregar</button>
+      <button class="btn-secondary" id="btn-cancelar-cli" style="display:none" onclick="cancelarEdicionCliente()">Cancelar</button>
+    </div>
+    <input class="search-box" type="text" placeholder="🔍 Buscar cliente..." oninput="filtrarClientes(this.value)"/>
+    <div id="clientes-list">
+      ${renderClientesList(clientes)}
+    </div>
+  `;
+}
+
+function renderClientesList(lista) {
+  if (!lista.length) return '<div class="loading">No hay clientes aún</div>';
+  return lista.map(c => `
+    <div class="cliente-row" id="cliente-row-${c.id}">
+      <div class="c-info">
+        <div class="c-nombre">${c.nombre}</div>
+        <div class="c-meta">${[c.telefono, c.email].filter(Boolean).join(' · ') || 'Sin datos de contacto'}${c.notas ? ' · ' + c.notas : ''}</div>
+      </div>
+      <button onclick="editarCliente(${c.id})" title="Editar"
+        style="background:var(--crema);border:none;border-radius:8px;padding:5px 10px;cursor:pointer;color:var(--marron-claro);font-size:0.9rem;">✏️</button>
+      <button onclick="eliminarCliente(${c.id}, '${c.nombre.replace(/'/g,"\\'")}')" title="Eliminar"
+        style="background:none;border:none;cursor:pointer;color:var(--rosa);font-size:1rem;padding:5px 8px;border-radius:6px;">🗑️</button>
+    </div>
+  `).join('');
+}
+
+function filtrarClientes(q) {
+  const lista = clientes.filter(c => c.nombre.toLowerCase().includes(q.toLowerCase()));
+  document.getElementById('clientes-list').innerHTML = renderClientesList(lista);
+}
+
+function editarCliente(id) {
+  const c = clientes.find(x => x.id === id);
+  if (!c) return;
+  clienteEditandoId = id;
+  document.getElementById('cli-nombre').value = c.nombre;
+  document.getElementById('cli-telefono').value = c.telefono || '';
+  document.getElementById('cli-email').value = c.email || '';
+  document.getElementById('cli-notas').value = c.notas || '';
+  document.querySelector('#form-cliente button.btn-primary').textContent = '💾 Guardar cambios';
+  document.getElementById('btn-cancelar-cli').style.display = '';
+  document.getElementById('cli-nombre').focus();
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+function cancelarEdicionCliente() {
+  clienteEditandoId = null;
+  document.getElementById('cli-nombre').value = '';
+  document.getElementById('cli-telefono').value = '';
+  document.getElementById('cli-email').value = '';
+  document.getElementById('cli-notas').value = '';
+  document.querySelector('#form-cliente button.btn-primary').textContent = '+ Agregar';
+  document.getElementById('btn-cancelar-cli').style.display = 'none';
+}
+
+async function guardarCliente() {
+  const nombre = document.getElementById('cli-nombre').value.trim();
+  const telefono = document.getElementById('cli-telefono').value.trim();
+  const email = document.getElementById('cli-email').value.trim();
+  const notas = document.getElementById('cli-notas').value.trim();
+  if (!nombre) { toast('Ingresá un nombre', '#e8a598'); return; }
+
+  if (clienteEditandoId) {
+    const r = await put(`/clientes/${clienteEditandoId}`, { nombre, telefono, email, notas });
+    if (r.detail) { toast(r.detail, '#e8a598'); return; }
+    const idx = clientes.findIndex(c => c.id === clienteEditandoId);
+    if (idx >= 0) clientes[idx] = r;
+    cancelarEdicionCliente();
+    document.getElementById('clientes-list').innerHTML = renderClientesList(clientes);
+    toast('✓ Cliente actualizado');
+  } else {
+    const r = await post('/clientes', { nombre, telefono, email, notas });
+    if (r.detail) { toast(r.detail, '#e8a598'); return; }
+    clientes.push(r);
+    clientes.sort((a,b) => a.nombre.localeCompare(b.nombre));
+    cancelarEdicionCliente();
+    document.getElementById('clientes-list').innerHTML = renderClientesList(clientes);
+    toast('✓ Cliente creado');
+  }
+}
+
+async function eliminarCliente(id, nombre) {
+  if (!confirm(`¿Eliminar a "${nombre}"?`)) return;
+  const r = await del(`/clientes/${id}`);
+  if (r && r.detail) { toast(r.detail, '#e8a598'); return; }
+  clientes = clientes.filter(c => c.id !== id);
+  document.getElementById('clientes-list').innerHTML = renderClientesList(clientes);
+  toast('Cliente eliminado', '#c97b6e');
+}
+
+// ── PRESUPUESTOS ──
+function estadoLabel(estado) {
+  const map = { borrador: 'Borrador', enviado: 'Enviado', aprobado: 'Aprobado', rechazado: 'Rechazado' };
+  return map[estado] || estado;
+}
+
+function renderPresupuestosList(lista) {
+  if (!lista.length) return '<div class="loading">No hay presupuestos aún</div>';
+  return lista.map(p => `
+    <div class="presu-row" onclick="abrirPresupuesto(${p.id})">
+      <div class="p-info">
+        <div class="p-titulo">${p.titulo}</div>
+        <div class="p-meta">${p.cliente_nombre ? p.cliente_nombre : 'Sin cliente'} · ${new Date(p.created_at).toLocaleDateString('es-AR')}</div>
+      </div>
+      <span class="estado-tag estado-${p.estado}">${estadoLabel(p.estado)}</span>
+      <div class="p-total">${fmt(p.total)}</div>
+    </div>
+  `).join('');
+}
+
+function filtrarPresupuestos(q) {
+  const lista = presupuestos.filter(p => p.titulo.toLowerCase().includes(q.toLowerCase()) || (p.cliente_nombre || '').toLowerCase().includes(q.toLowerCase()));
+  document.getElementById('presupuestos-list').innerHTML = renderPresupuestosList(lista);
+}
+
+function renderPresupuestos(app) {
+  app.innerHTML = `
+    <div class="sec-title">Presupuestos</div>
+    <div class="nueva-receta-form">
+      <div><label>Título</label><input type="text" id="nuevo-presu-titulo" placeholder="Ej: Cumpleaños Sofía"/></div>
+      <div>
+        <label>Cliente (opcional)</label>
+        <select id="nuevo-presu-cliente" style="border:1.5px solid #e8d8cc;border-radius:8px;padding:8px 12px;font-family:'DM Sans',sans-serif;font-size:0.9rem;background:var(--crema);color:var(--texto);min-width:180px;">
+          <option value="">Sin cliente</option>
+          ${clientes.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('')}
+        </select>
+      </div>
+      <button class="btn-primary" onclick="crearPresupuesto()">+ Nuevo presupuesto</button>
+    </div>
+    <input class="search-box" type="text" placeholder="🔍 Buscar presupuesto..." oninput="filtrarPresupuestos(this.value)"/>
+    <div id="presupuestos-list">
+      ${renderPresupuestosList(presupuestos)}
+    </div>
+  `;
+}
+
+async function crearPresupuesto() {
+  const titulo = document.getElementById('nuevo-presu-titulo').value.trim();
+  const clienteSel = document.getElementById('nuevo-presu-cliente').value;
+  if (!titulo) { toast('Ingresá un título', '#e8a598'); return; }
+  const cliente_id = clienteSel ? parseInt(clienteSel) : null;
+  const r = await post('/presupuestos', { titulo, cliente_id, items: [] });
+  if (r.detail) { toast(r.detail, '#e8a598'); return; }
+  presupuestos = await get('/presupuestos');
+  presupuestoDetalle = r;
+  render();
+  toast('✓ Presupuesto creado');
+}
+
+async function abrirPresupuesto(id) {
+  const data = await get(`/presupuestos/${id}`);
+  presupuestoDetalle = data;
+  render();
+}
+
+async function volverPresupuestos() {
+  presupuestoDetalle = null;
+  presupuestos = await get('/presupuestos');
+  render();
+}
+
+function renderPresupuestoDetalle(app) {
+  const p = presupuestoDetalle;
+  const estados = ['borrador', 'enviado', 'aprobado', 'rechazado'];
+  app.innerHTML = `
+    <div class="detalle-header">
+      <button class="btn-back" onclick="volverPresupuestos()">← Volver</button>
+      <div class="detalle-titulo">${p.titulo}</div>
+      <button onclick="eliminarPresupuesto(${p.id}, '${p.titulo.replace(/'/g,"\\'")}')"
+        style="margin-left:auto;background:#fce8e4;border:none;border-radius:10px;padding:8px 16px;cursor:pointer;color:var(--rosa-oscuro);font-weight:600;font-size:0.88rem;">
+        🗑️ Eliminar
+      </button>
+    </div>
+    <div class="estado-selector">
+      ${estados.map(e => `<button class="estado-btn ${p.estado === e ? 'active' : ''}" onclick="cambiarEstadoPresupuesto(${p.id}, '${e}')">${estadoLabel(e)}</button>`).join('')}
+    </div>
+    <div class="config-receta">
+      <div>
+        <label>Cliente</label>
+        <select id="presu-cliente" style="border:1.5px solid #e8d8cc;border-radius:8px;padding:8px 12px;font-family:'DM Sans',sans-serif;font-size:0.9rem;background:var(--blanco);color:var(--texto);min-width:180px;">
+          <option value="">Sin cliente</option>
+          ${clientes.map(c => `<option value="${c.id}" ${c.id === p.cliente_id ? 'selected' : ''}>${c.nombre}</option>`).join('')}
+        </select>
+      </div>
+      <button class="btn-primary" onclick="guardarClientePresupuesto(${p.id})">Guardar</button>
+    </div>
+    <div class="notas-detalle">
+      <label>📝 Notas</label>
+      <textarea id="presu-notas" placeholder="Notas del presupuesto...">${p.notas || ''}</textarea>
+      <div style="margin-top:8px;"><button class="btn-secondary" onclick="guardarNotasPresupuesto(${p.id})">Guardar notas</button></div>
+    </div>
+    <div class="sec-title">Ítems</div>
+    <div id="items-list">
+      ${renderItemsList(p.items)}
+    </div>
+    <div class="detalle-stat" style="background:var(--marron);color:var(--crema);max-width:240px;margin-top:12px;">
+      <div class="num" style="color:var(--amarillo)">${fmt(p.total)}</div>
+      <div class="lbl" style="color:rgba(255,255,255,0.7)">Total presupuesto</div>
+    </div>
+    <div class="add-ing-form">
+      <div>
+        <label>Receta (opcional)</label>
+        <select id="add-item-receta" onchange="autocompletarItem()" style="min-width:180px;">
+          <option value="">Ítem libre (sin receta)</option>
+          ${recetas.map(r => `<option value="${r.id}" data-precio="${r.precio_final}" data-nombre="${r.nombre}">${r.nombre}</option>`).join('')}
+        </select>
+      </div>
+      <div><label>Descripción</label><input type="text" id="add-item-desc" placeholder="Ej: Torta chocolate 20cm"/></div>
+      <div><label>Cantidad</label><input type="number" id="add-item-cant" value="1" min="1"/></div>
+      <div><label>Precio unitario ($)</label><input type="number" id="add-item-precio" placeholder="Ej: 8000"/></div>
+      <button class="btn-primary" onclick="agregarItem(${p.id})">+ Agregar ítem</button>
+    </div>
+  `;
+}
+
+function autocompletarItem() {
+  const sel = document.getElementById('add-item-receta');
+  const opt = sel.options[sel.selectedIndex];
+  if (sel.value) {
+    document.getElementById('add-item-desc').value = opt.dataset.nombre;
+    document.getElementById('add-item-precio').value = opt.dataset.precio;
+  } else {
+    document.getElementById('add-item-desc').value = '';
+    document.getElementById('add-item-precio').value = '';
+  }
+}
+
+function renderItemsList(items) {
+  if (!items || !items.length) return '<div style="color:var(--gris);font-style:italic;padding:12px">Sin ítems aún</div>';
+  return items.map(i => `
+    <div class="item-row">
+      <span class="i-desc">${i.descripcion}${i.receta_nombre ? ` <span style="color:var(--gris);font-size:0.78rem;">(receta: ${i.receta_nombre})</span>` : ''}</span>
+      <span class="i-cant">x${i.cantidad}</span>
+      <span class="i-precio">${fmt(i.precio_unit)} c/u</span>
+      <span class="i-total">${fmt(i.precio_total)}</span>
+      <button class="btn-del" onclick="quitarItem(${i.presupuesto_id}, ${i.id})" title="Quitar">✕</button>
+    </div>
+  `).join('');
+}
+
+async function agregarItem(presupuestoId) {
+  const recetaSel = document.getElementById('add-item-receta').value;
+  const descripcion = document.getElementById('add-item-desc').value.trim();
+  const cantidad = parseInt(document.getElementById('add-item-cant').value) || 1;
+  const precio_unit = parseFloat(document.getElementById('add-item-precio').value);
+  if (!descripcion) { toast('Ingresá una descripción', '#e8a598'); return; }
+  if (isNaN(precio_unit) || precio_unit < 0) { toast('Precio inválido', '#e8a598'); return; }
+  const receta_id = recetaSel ? parseInt(recetaSel) : null;
+
+  const data = await post(`/presupuestos/${presupuestoId}/items`, { receta_id, descripcion, cantidad, precio_unit });
+  if (data && data.detail) { toast(data.detail, '#e8a598'); return; }
+  presupuestoDetalle = data;
+  presupuestos = await get('/presupuestos');
+  document.getElementById('items-list').innerHTML = renderItemsList(data.items);
+  document.querySelector('.detalle-stat .num').textContent = fmt(data.total);
+  document.getElementById('add-item-desc').value = '';
+  document.getElementById('add-item-precio').value = '';
+  document.getElementById('add-item-receta').value = '';
+  toast('✓ Ítem agregado');
+}
+
+async function quitarItem(presupuestoId, itemId) {
+  if (!confirm('¿Quitar este ítem?')) return;
+  const data = await del(`/presupuestos/${presupuestoId}/items/${itemId}`);
+  let detalle = data;
+  if (!detalle || !detalle.items) detalle = await get(`/presupuestos/${presupuestoId}`);
+  presupuestoDetalle = detalle;
+  presupuestos = await get('/presupuestos');
+  document.getElementById('items-list').innerHTML = renderItemsList(detalle.items);
+  document.querySelector('.detalle-stat .num').textContent = fmt(detalle.total);
+  toast('Ítem quitado', '#c97b6e');
+}
+
+async function cambiarEstadoPresupuesto(presupuestoId, estado) {
+  const data = await put(`/presupuestos/${presupuestoId}`, { estado });
+  presupuestoDetalle = data;
+  presupuestos = await get('/presupuestos');
+  render();
+  toast('✓ Estado actualizado');
+}
+
+async function guardarClientePresupuesto(presupuestoId) {
+  const sel = document.getElementById('presu-cliente').value;
+  const cliente_id = sel ? parseInt(sel) : null;
+  const data = await put(`/presupuestos/${presupuestoId}`, { cliente_id });
+  presupuestoDetalle = data;
+  presupuestos = await get('/presupuestos');
+  toast('✓ Cliente actualizado');
+}
+
+async function guardarNotasPresupuesto(presupuestoId) {
+  const notas = document.getElementById('presu-notas').value.trim();
+  const data = await put(`/presupuestos/${presupuestoId}`, { notas });
+  presupuestoDetalle = data;
+  toast('✓ Notas guardadas');
+}
+
+async function eliminarPresupuesto(id, titulo) {
+  if (!confirm(`¿Eliminar el presupuesto "${titulo}"?\n\nEsta acción no se puede deshacer.`)) return;
+  await del(`/presupuestos/${id}`);
+  presupuestoDetalle = null;
+  presupuestos = await get('/presupuestos');
+  tabActual = 'presupuestos';
+  render();
+  toast('Presupuesto eliminado', '#c97b6e');
 }
 
 // ── USUARIOS (solo admin) ──
